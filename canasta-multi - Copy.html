@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaplan Canasta - Multi</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #000000;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .nav-bar {
+            background: linear-gradient(135deg, #00AA00 0%, #006600 100%);
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(255, 215, 0, 0.3);
+            border-bottom: 2px solid #FFD700;
+        }
+
+        .nav-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .home-link {
+            color: #FFD700;
+            text-decoration: none;
+            font-size: 1.2em;
+            font-weight: 600;
+            padding: 8px 20px;
+            border: 2px solid #FFD700;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .home-link:hover {
+            background: rgba(255, 215, 0, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .game-title {
+            color: #FFD700;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .game-container {
+            flex: 1;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        iframe {
+            flex: 1;
+            width: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav-bar">
+        <div class="nav-content">
+            <a href="index.html" class="home-link">🏠 Home</a>
+            <span class="game-title">🎴 Kaplan Canasta - Multi</span>
+        </div>
+    </nav>
+    <div class="game-container">
+        <iframe src="games/KaplanCanastaMulti.html"></iframe>
+    </div>
+</body>
+</html>

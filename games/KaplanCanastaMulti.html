@@ -9,6 +9,137 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f2e1d; color: white; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
     
+    /* MOBILE RESPONSIVE SCALING */
+    @media (max-width: 768px) {
+        body { 
+            transform-origin: top left;
+            overflow: auto;
+        }
+        
+        .top-bar {
+            padding: 8px 12px !important;
+        }
+        
+        h1 { font-size: 14px !important; }
+        
+        .controls select, .controls button { 
+            margin-left: 6px !important;
+            padding: 3px 6px !important;
+            font-size: 10px !important;
+        }
+        
+        .dropbtn {
+            padding: 4px 8px !important;
+            font-size: 10px !important;
+        }
+        
+        .game-container {
+            grid-template-columns: 140px 1fr 140px !important;
+            grid-template-rows: 130px 1fr 130px !important;
+            gap: 3px !important;
+            padding: 3px !important;
+        }
+        
+        .player-info { font-size: 10px !important; }
+        .stats-row { font-size: 9px !important; gap: 6px !important; }
+        .stat-box { padding: 1px 3px !important; }
+        
+        .red3-box { 
+            min-height: 16px !important; 
+            font-size: 9px !important;
+            margin-bottom: 3px !important;
+        }
+        
+        /* Smaller cards on mobile */
+        .card-h { width: 32px !important; height: 45px !important; font-size: 11px !important; margin: 1px !important; }
+        .card-v { width: 32px !important; height: 45px !important; font-size: 11px !important; margin: 1px !important; }
+        
+        .card-back::after { font-size: 16px !important; }
+        
+        /* Center table elements */
+        .piles-row { gap: 25px !important; }
+        
+        .discard-box {
+            width: 50px !important;
+            height: 70px !important;
+        }
+        .discard-card { font-size: 16px !important; }
+        
+        .draw-box {
+            width: 50px !important;
+            height: 70px !important;
+        }
+        .draw-card { 
+            width: 45px !important;
+            height: 65px !important;
+        }
+        
+        .meld-area {
+            gap: 10px !important;
+            padding: 6px !important;
+        }
+        
+        .meld-pile {
+            min-width: 50px !important;
+            padding: 3px !important;
+        }
+        
+        .meld-pile.canasta::after {
+            font-size: 7px !important;
+            padding: 1px 4px !important;
+            top: -8px !important;
+        }
+        
+        .meld-label { font-size: 8px !important; }
+        .meld-count { font-size: 7px !important; }
+        .meld-cards { font-size: 11px !important; }
+        .mini-card { width: 6px !important; }
+        
+        .action-box-container {
+            min-width: 180px !important;
+            padding: 12px 18px !important;
+        }
+        
+        .center-table {
+            border-width: 3px !important;
+            border-radius: 10px !important;
+            padding: 6px !important;
+            gap: 6px !important;
+        }
+    }
+    
+    /* PORTRAIT PHONE - EVEN SMALLER */
+    @media (max-width: 480px) {
+        .game-container {
+            grid-template-columns: 100px 1fr 100px !important;
+            grid-template-rows: 110px 1fr 110px !important;
+        }
+        
+        .card-h { width: 28px !important; height: 40px !important; font-size: 9px !important; }
+        .card-v { width: 28px !important; height: 40px !important; font-size: 9px !important; }
+        
+        .discard-box {
+            width: 40px !important;
+            height: 56px !important;
+        }
+        .discard-card { font-size: 14px !important; }
+        
+        .draw-box {
+            width: 40px !important;
+            height: 56px !important;
+        }
+        .draw-card { 
+            width: 36px !important;
+            height: 52px !important;
+        }
+        
+        .piles-row { gap: 15px !important; }
+        
+        .meld-pile {
+            min-width: 40px !important;
+        }
+    }
+    
     /* --- TOP BAR --- */
     .top-bar {
         background: rgba(0,0,0,0.8); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ffd700; flex-shrink: 0;
