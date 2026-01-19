@@ -9,6 +9,113 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f2e1d; color: white; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
     
+    /* MOBILE RESPONSIVE SCALING */
+    @media (max-width: 768px) {
+        body { 
+            transform-origin: top left;
+            overflow: auto;
+        }
+        
+        .top-bar {
+            height: 50px !important;
+            padding: 5px 10px !important;
+        }
+        
+        h1 { font-size: 14px !important; margin-right: 10px !important; }
+        .status-text { font-size: 12px !important; min-width: 100px !important; }
+        .controls { gap: 5px !important; }
+        .controls button, .controls input { 
+            padding: 4px 8px !important; 
+            font-size: 10px !important;
+            margin-left: 5px !important;
+        }
+        
+        .scoreboard { 
+            gap: 10px !important; 
+            font-size: 11px !important; 
+            padding: 3px 10px !important;
+        }
+        .score-val { font-size: 14px !important; }
+        .score-label { font-size: 8px !important; }
+        
+        .game-container {
+            grid-template-columns: 140px 1fr 140px !important;
+            grid-template-rows: 120px 1fr 120px !important;
+            gap: 3px !important;
+            padding: 3px !important;
+        }
+        
+        .player-info { font-size: 10px !important; }
+        .indicator-light { width: 8px !important; height: 8px !important; }
+        
+        .trump-indicator { 
+            width: 20px !important; 
+            height: 28px !important; 
+            font-size: 8px !important;
+        }
+        
+        .book-light { 
+            width: 10px !important; 
+            height: 10px !important;
+        }
+        
+        /* Smaller cards on mobile */
+        .p-south .card-h { width: 35px !important; height: 49px !important; font-size: 11px !important; margin: 1px !important; }
+        .card-h { width: 35px !important; height: 49px !important; font-size: 11px !important; margin: 1px !important; }
+        .card-v { width: 35px !important; height: 49px !important; font-size: 11px !important; margin: 1px !important; }
+        
+        .hand-container { gap: 2px !important; min-height: 50px !important; }
+        
+        .trick-area {
+            width: 150px !important;
+            height: 150px !important;
+        }
+        
+        .trick-card { transform: scale(0.6) !important; }
+        
+        .msg-box {
+            font-size: 11px !important;
+            padding: 6px 15px !important;
+        }
+        
+        .action-box {
+            min-width: 160px !important;
+            padding: 8px !important;
+        }
+        .action-btn { 
+            padding: 4px 8px !important; 
+            font-size: 10px !important; 
+        }
+        
+        /* Hide chat widget on mobile */
+        .chat-widget { display: none !important; }
+        
+        /* Make center table smaller */
+        .center-table {
+            border-width: 3px !important;
+            border-radius: 10px !important;
+        }
+    }
+    
+    /* PORTRAIT PHONE - EVEN SMALLER */
+    @media (max-width: 480px) {
+        .game-container {
+            grid-template-columns: 100px 1fr 100px !important;
+            grid-template-rows: 100px 1fr 100px !important;
+        }
+        
+        .p-south .card-h { width: 30px !important; height: 42px !important; font-size: 9px !important; }
+        .card-h { width: 30px !important; height: 42px !important; font-size: 9px !important; }
+        .card-v { width: 30px !important; height: 42px !important; font-size: 9px !important; }
+        
+        .trick-area {
+            width: 120px !important;
+            height: 120px !important;
+        }
+        
+        .trick-card { transform: scale(0.5) !important; }
+    }
+    
     /* --- TOP BAR --- */
     .top-bar {
         background: rgba(0,0,0,0.9); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ffd700; flex-shrink: 0; height: 70px;
