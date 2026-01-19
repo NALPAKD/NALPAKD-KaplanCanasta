@@ -1,0 +1,1830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Euchre - Multiplayer</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f2e1d; color: white; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    
+    /* MOBILE RESPONSIVE SCALING */
+    @media (max-width: 768px) {
+        body { 
+            transform-origin: top left;
+            overflow: auto;
+        }
+        
+        .top-bar {
+            height: 40px !important;
+            padding: 4px 8px !important;
+        }
+        
+        h1 { font-size: 12px !important; margin-right: 8px !important; }
+        .status-text { font-size: 10px !important; min-width: 80px !important; }
+        .controls { gap: 4px !important; }
+        .controls button, .controls input { 
+            padding: 3px 6px !important; 
+            font-size: 9px !important;
+            margin-left: 4px !important;
+        }
+        
+        .scoreboard { 
+            gap: 8px !important; 
+            font-size: 10px !important; 
+            padding: 2px 8px !important;
+        }
+        .score-val { font-size: 12px !important; }
+        .score-label { font-size: 7px !important; }
+        
+        .game-container {
+            grid-template-columns: 100px 1fr 100px !important;
+            grid-template-rows: 90px 1fr 90px !important;
+            gap: 2px !important;
+            padding: 2px !important;
+        }
+        
+        .player-info { font-size: 9px !important; }
+        .indicator-light { width: 6px !important; height: 6px !important; }
+        
+        .trump-indicator { 
+            width: 18px !important; 
+            height: 25px !important; 
+            font-size: 7px !important;
+        }
+        
+        .book-light { 
+            width: 8px !important; 
+            height: 8px !important;
+        }
+        
+        /* Smaller cards on mobile */
+        .p-south .card-h { width: 28px !important; height: 39px !important; font-size: 9px !important; margin: 1px !important; }
+        .card-h { width: 28px !important; height: 39px !important; font-size: 9px !important; margin: 1px !important; }
+        .card-v { width: 28px !important; height: 39px !important; font-size: 9px !important; margin: 1px !important; }
+        
+        .hand-container { gap: 1px !important; min-height: 40px !important; }
+        
+        .trick-area {
+            width: 120px !important;
+            height: 120px !important;
+        }
+        
+        .trick-card { transform: scale(0.5) !important; }
+        
+        .msg-box {
+            font-size: 10px !important;
+            padding: 5px 12px !important;
+        }
+        
+        .action-box {
+            min-width: 140px !important;
+            padding: 6px !important;
+        }
+        .action-btn { 
+            padding: 3px 6px !important; 
+            font-size: 9px !important; 
+        }
+        
+        /* Hide chat widget on mobile */
+        .chat-widget { display: none !important; }
+        
+        /* Make center table smaller */
+        .center-table {
+            border-width: 2px !important;
+            border-radius: 8px !important;
+        }
+    }
+    
+    /* PORTRAIT PHONE - EVEN SMALLER */
+    @media (max-width: 480px) {
+        .game-container {
+            grid-template-columns: 80px 1fr 80px !important;
+            grid-template-rows: 80px 1fr 80px !important;
+        }
+        
+        .p-south .card-h { width: 24px !important; height: 34px !important; font-size: 8px !important; }
+        .card-h { width: 24px !important; height: 34px !important; font-size: 8px !important; }
+        .card-v { width: 24px !important; height: 34px !important; font-size: 8px !important; }
+        
+        .trick-area {
+            width: 100px !important;
+            height: 100px !important;
+        }
+        
+        .trick-card { transform: scale(0.45) !important; }
+        
+        .top-bar {
+            height: 35px !important;
+            padding: 3px 6px !important;
+        }
+        
+        h1 { font-size: 11px !important; }
+        .status-text { font-size: 9px !important; }
+    }
+    
+    /* --- TOP BAR --- */
+    .top-bar {
+        background: rgba(0,0,0,0.9); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ffd700; flex-shrink: 0; height: 70px;
+    }
+    h1 { font-size: 18px; color: #ffd700; margin: 0; margin-right: 20px; }
+    
+    .status-text { font-size: 16px; color: #fff; font-weight: bold; margin-left: auto; margin-right: 20px; min-width: 150px; text-align: right;}
+    .controls { display: flex; align-items: center; gap: 10px; }
+    
+    .controls button, .controls input { margin-left: 10px; padding: 5px 10px; border-radius: 4px; border: 1px solid #555; background: #333; color: white; cursor: pointer; font-size: 12px; }
+    .controls button:hover { background: #555; }
+    
+    /* Toggles */
+    .btn-training { background: #2980b9; border: 1px solid #3498db; }
+    .btn-training.active { background: #e67e22; border: 1px solid #f39c12; box-shadow: 0 0 10px rgba(230,126,34, 0.5); }
+    
+    .btn-expert { background: #8e44ad; border: 1px solid #9b59b6; }
+    .btn-expert.active { background: #e056fd; border: 1px solid #be2edd; box-shadow: 0 0 10px rgba(224,86,253, 0.5); }
+
+    /* --- SCOREBOARD --- */
+    .scoreboard {
+        display: flex; gap: 20px; font-size: 14px; font-weight: bold; color: #ddd; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 5px;
+    }
+    .score-box { display: flex; flex-direction: column; align-items: center; }
+    .score-val { font-size: 18px; color: #fff; }
+    .score-label { font-size: 10px; color: #aaa; text-transform: uppercase; }
+
+    /* --- AI CHAT BOT --- */
+    .chat-widget {
+        position: fixed; bottom: 20px; right: 20px; width: 300px; height: 400px; 
+        background: rgba(20,20,20,0.95); border: 2px solid #00ffff; border-radius: 10px; 
+        display: none; flex-direction: column; z-index: 1000; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    }
+    .chat-header { background: #00ffff; color: #000; padding: 10px; font-weight: bold; display: flex; justify-content: space-between; border-radius: 8px 8px 0 0; }
+    .chat-close { cursor: pointer; font-weight: bold; }
+    .chat-body { flex: 1; padding: 10px; overflow-y: auto; font-size: 13px; display: flex; flex-direction: column; gap: 10px; }
+    .chat-msg { padding: 5px 10px; border-radius: 5px; max-width: 90%; }
+    .chat-msg.ai { background: #333; color: #fff; align-self: flex-start; }
+    .chat-msg.user { background: #0084ff; color: #fff; align-self: flex-end; }
+    .chat-input { padding: 10px; border-top: 1px solid #333; display: flex; }
+    .chat-input input { flex: 1; padding: 5px; border-radius: 4px; border: none; margin-right: 5px; }
+    .chat-input button { padding: 5px 15px; border-radius: 4px; border: none; background: #00ffff; color: black; font-weight: bold; cursor: pointer; }
+
+    /* --- GAME TABLE LAYOUT --- */
+    .game-container {
+        flex: 1; display: grid; 
+        grid-template-columns: 200px 1fr 200px; 
+        grid-template-rows: 180px 1fr 180px; 
+        gap: 5px; padding: 5px;
+        background: #1a472a; position: relative;
+    }
+
+    /* --- PLAYER AREAS --- */
+    .player-area {
+        background: rgba(0,0,0,0.3); border-radius: 8px; padding: 5px; display: flex; flex-direction: column; align-items: center; border: 1px solid #333; position: relative;
+        overflow: visible; min-height: 100px;
+    }
+    .player-area.active-turn { border: 2px solid #ffd700; box-shadow: 0 0 15px rgba(255,215,0,0.3); background: rgba(255,215,0,0.1); }
+    
+    #area-south {
+        overflow-x: auto;
+        overflow-y: visible;
+        justify-content: flex-start;
+        min-height: 120px;
+    }
+    
+    #area-north, #area-west, #area-east {
+        justify-content: center;
+    }
+    
+    .player-info { font-size: 12px; font-weight: bold; color: #ffd700; text-align: center; margin-bottom: 5px; flex-shrink: 0; display: flex; align-items: center; gap: 5px; justify-content: center;}
+    
+    /* INDICATOR LIGHTS */
+    .indicator-light { width: 10px; height: 10px; border-radius: 50%; background: #333; border: 1px solid #555; display: inline-block; }
+    .light-deal-on { background: #00ff00; box-shadow: 0 0 5px #00ff00; border-color: #00ff00; }
+    .light-round-on { background: #ff00ff; box-shadow: 0 0 5px #ff00ff; border-color: #ff00ff; }
+
+    .trump-indicator { 
+        position: absolute; top: 5px; right: 5px; width: 25px; height: 35px; 
+        border-radius: 4px; background: #fff; display: flex; justify-content: center; align-items: center; font-size: 10px; font-weight: bold; 
+    }
+
+    /* BOOK INDICATORS */
+    .book-indicators {
+        display: flex; gap: 2px; margin-top: 5px; justify-content: center; 
+    }
+    .book-light {
+        width: 12px; height: 12px; border-radius: 2px; background: #441111; border: 1px solid #552222;
+    }
+    .book-light.won {
+        background: #00ff00; box-shadow: 0 0 5px #00ff00; border-color: #00ff00;
+    }
+
+    /* Hand Layouts */
+    .hand-container {
+        display: flex; justify-content: center; 
+        align-items: center; width: 100%; perspective: 1000px; overflow: visible; flex-wrap: wrap; gap: 3px;
+        min-height: 70px;
+    }
+    .hand-vertical { flex-direction: column; }
+    .hand-horizontal { flex-direction: row; }
+
+    /* Card Styles */
+    .card {
+        background: white; border-radius: 4px; position: relative; 
+        box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        display: flex; justify-content: center; align-items: center; font-weight: bold; user-select: none;
+        transition: transform 0.2s; cursor: pointer; flex-shrink: 0;
+    }
+    
+    /* SIZES */
+    .p-south .card-h { width: 45px; height: 63px; margin: 2px; font-size: 14px; } 
+    .card-h { width: 45px; height: 63px; margin: 2px; font-size: 14px; } 
+    .card-v { width: 45px; height: 63px; margin: 2px; font-size: 14px; transform: rotate(90deg); }
+
+    .card-red { color: #d00; }
+    .card-black { color: #000; }
+    
+    .card-h.selected, .card-v.selected { transform: translateY(-15px) !important; border: 2px solid #00ffff; z-index: 100; }
+    .card-v.selected { transform: rotate(90deg) translateX(-15px) !important; }
+
+    /* TRAINING MODE HALO */
+    .training-halo {
+        border: 3px solid #00ff00 !important;
+        box-shadow: 0 0 15px #00ff00 !important;
+        transform: scale(1.1) translateY(-15px) !important;
+        z-index: 200;
+    }
+
+    .card-back {
+        background: #2c3e50;
+        background-image: repeating-linear-gradient(45deg, #34495e 0px, #34495e 10px, #2c3e50 10px, #2c3e50 20px);
+        border: 2px solid white;
+    }
+    .card-back::after { content: '🂠'; font-size: 20px; color: #888; }
+
+    /* --- CENTER TABLE AREA --- */
+    .center-table {
+        grid-column: 2; grid-row: 2;
+        background: #27ae60; border: 5px solid #1e3a28; border-radius: 15px;
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
+        position: relative;
+    }
+    
+    .trick-area {
+        width: 200px; height: 200px; position: relative;
+        border: 1px dashed rgba(255,255,255,0.2); border-radius: 50%;
+        display: flex; justify-content: center; align-items: center;
+    }
+
+    .trick-card { position: absolute; transition: all 0.3s ease; }
+    .trick-north { top: 10px; transform: scale(0.8); }
+    .trick-south { bottom: 10px; transform: scale(0.8); }
+    .trick-west { left: 10px; transform: scale(0.8); }
+    .trick-east { right: 10px; transform: scale(0.8); }
+
+    /* Overlays */
+    .msg-box {
+        position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+        background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; color: #fff; font-size: 14px; pointer-events: none; white-space: nowrap; z-index: 20; border: 1px solid #555;
+    }
+
+    .training-tip {
+        position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+        background: rgba(0,0,0,0.9); padding: 10px 20px; border-radius: 8px; color: #00ff00; font-size: 13px; pointer-events: none; white-space: nowrap; z-index: 20; border: 1px solid #00ff00; display: none;
+    }
+
+    /* Action Box for Bidding */
+    .action-box {
+        position: absolute; bottom: 20%; left: 50%; transform: translateX(-50%);
+        display: none; flex-direction: column; gap: 10px; z-index: 200; background: rgba(0,0,0,0.9); padding: 10px; border-radius: 8px; border: 1px solid #00ffff; min-width: 200px;
+    }
+    .action-buttons { display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; }
+    .action-btn { padding: 5px 10px; border-radius: 4px; border: none; cursor: pointer; font-size: 12px; color: white; background: #2980b9; }
+    .action-btn:hover { background: #3498db; }
+    .action-btn.active { border: 2px solid #ffd700; background: #8e44ad; }
+    .btn-pass { background: #c0392b; }
+    .btn-pass:hover { background: #e74c3c; }
+    .btn-order { background: #27ae60; }
+    .btn-order:hover { background: #2ecc71; }
+
+    /* Grid Positioning */
+    .p-north { grid-column: 2; grid-row: 1; }
+    .p-south { grid-column: 2; grid-row: 3; z-index: 10; background: rgba(0,0,0,0.5); }
+    .p-west { grid-column: 1; grid-row: 2; }
+    .p-east { grid-column: 3; grid-row: 2; }
+
+    /* MULTIPLAYER LOBBY */
+    #mpLobby {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; display: none; justify-content: center; align-items: center; flex-direction: column;
+    }
+    #mpLobby.active { display: flex; }
+    #mpLobby h1 { color: #ffd700; margin-bottom: 20px; font-size: 32px; }
+    #mpLobby p { color: #00ffff; margin-bottom: 20px; font-size: 16px; }
+    .mp-lobby-container { background: rgba(0,0,0,0.8); padding: 40px; border-radius: 10px; border: 2px solid #ffd700; max-width: 600px; min-width: 400px; text-align: center; }
+    #mpMyId { color: #ffd700; font-size: 14px; font-family: monospace; background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 4px; display: inline-block; margin-bottom: 20px; }
+    .mp-id-label { color: #aaa; font-size: 12px; text-transform: uppercase; display: block; margin-bottom: 5px; }
+    #mpConnections { margin: 20px 0; min-height: 100px; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 5px; border: 1px solid #555; }
+    .mp-connection { background: rgba(100,200,100,0.2); padding: 8px 15px; margin: 5px 0; border-radius: 4px; border-left: 3px solid #2ecc71; color: #fff; }
+    #mpStartArea { margin: 20px 0; }
+    .btn-start-mp { background: #27ae60; border: none; padding: 10px 30px; color: white; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 14px; margin: 5px; }
+    .btn-start-mp:hover { background: #2ecc71; }
+    #mpHostBtn, #mpJoinBtn { background: #2980b9; border: 1px solid #3498db; padding: 8px 15px; color: white; border-radius: 4px; cursor: pointer; margin: 5px; font-size: 12px; }
+    #mpHostBtn:hover { background: #3498db; }
+    #mpJoinBtn:hover { background: #3498db; }
+    #mpHostBtn:disabled, #mpJoinBtn:disabled { background: #555; cursor: not-allowed; opacity: 0.5; }
+    #mpHostInput { padding: 8px; border-radius: 4px; border: 1px solid #555; background: #333; color: white; font-size: 12px; width: 200px; }
+
+</style>
+</head>
+<body>
+
+<!-- MULTIPLAYER LOBBY -->
+<div id="mpLobby">
+    <div class="mp-lobby-container">
+        <h1>🃏 EUCHRE MULTIPLAYER 🃏</h1>
+        <p style="color:#00ffff; margin-bottom:20px;">Peer-to-Peer Connection</p>
+        
+        <div>
+            <span class="mp-id-label">Your ID (Copy & Share):</span>
+            <div id="mpMyId">Loading...</div>
+        </div>
+        
+        <div style="margin: 20px 0; display: flex; justify-content: center; gap: 10px;">
+            <button id="mpHostBtn" onclick="mpBecomeHost()">👑 Become Host</button>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="mpHostInput" placeholder="Host ID">
+                <button id="mpJoinBtn" onclick="mpJoinHost()">Join Host</button>
+            </div>
+        </div>
+        
+        <div id="mpConnections"></div>
+        <div id="mpStartArea"></div>
+    </div>
+</div>
+
+<div class="top-bar">
+    <h1>🃏 EUCHRE 🃏</h1>
+    
+    <!-- New Scoreboard -->
+    <div class="scoreboard">
+        <div class="score-box">
+            <span class="score-val" id="score-team1">0</span>
+            <span class="score-label">US</span>
+        </div>
+        <div style="color:#555">|</div>
+        <div class="score-box">
+            <span class="score-val" id="score-team2">0</span>
+            <span class="score-label">THEM</span>
+        </div>
+    </div>
+
+    <div class="status-text" id="bannerStatus"></div>
+    <div class="controls">
+        <button id="btnExpert" class="btn-expert" onclick="toggleExpert()">Expert Mode: OFF</button>
+        <button id="btnTraining" class="btn-training" onclick="toggleTraining()">Training Mode: OFF</button>
+        <button onclick="toggleChat()">Ask AI</button>
+        <button onclick="newGame()">New Game</button>
+        <button onclick="showMultiplayerLobby()" style="background: #8e44ad; border-color: #9b59b6;">🌐 Multiplayer</button>
+    </div>
+</div>
+
+<div class="game-container">
+    <!-- North Player -->
+    <div class="player-area p-north" id="area-north">
+        <div class="trump-indicator" id="ind-north" style="display:none;"></div>
+        <div class="player-info" id="label-north">
+            NORTH (AI) 
+            <div id="deal-light-north" class="indicator-light" title="Dealer"></div>
+        </div>
+        
+        <div class="book-indicators" id="books-ind-north">
+            <div class="book-light"></div><div class="book-light"></div><div class="book-light"></div><div class="book-light"></div><div class="book-light"></div>
+        </div>
+
+        <div class="stats-row" style="margin-top:5px;">
+            <div class="stat-box">Rounds: <span id="rounds-north">0</span></div>
+        </div>
+        <div class="hand-container hand-vertical" id="hand-north"></div>
+    </div>
+
+    <!-- West Player -->
+    <div class="player-area p-west" id="area-west">
+        <div class="trump-indicator" id="ind-west" style="display:none;"></div>
+        <div class="player-info" id="label-west">
+            WEST (AI)
+            <div id="deal-light-west" class="indicator-light" title="Dealer"></div>
+        </div>
+        
+        <div class="book-indicators" id="books-ind-west">
+            <div class="book-light"></div><div class="book-light"></div><div class="book-light"></div><div class="book-light"></div><div class="book-light"></div>
+        </div>
+
+        <div class="stats-row" style="margin-top:5px;">
+            <div class="stat-box">Rounds: <span id="rounds-west">0</span></div>
+        </div>
+        <div class="hand-container hand-vertical" id="hand-west"></div>
+    </div>
+
+    <!-- Center Table -->
+    <div class="center-table">
+        <div class="msg-box" id="message">Welcome to Euchre!</div>
+        <div class="training-tip" id="trainingTip">Tip text goes here</div>
+        
+        <!-- Kitty Card Display -->
+        <div id="kittyDisplay" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none;">
+            <div style="text-align: center; color: #ffd700; font-size: 12px; margin-bottom: 5px; font-weight: bold;">KITTY CARD</div>
+            <div id="kittyCard" class="card card-h" style="width: 60px; height: 84px; font-size: 16px;">
+                <!-- Kitty card will be rendered here -->
+            </div>
+        </div>
+        
+        <div class="trick-area" id="trickArea">
+            <!-- Cards played in the trick appear here -->
+        </div>
+
+        <!-- Bidding / Action Box -->
+        <div id="actionBox" class="action-box">
+            <div style="text-align:center; color:#00ffff; font-weight:bold; margin-bottom:5px;" id="actionTitle">Order it up?</div>
+            <div class="action-buttons">
+                <button id="btnOrderUp" class="action-btn btn-order" onclick="orderUp()">ORDER UP</button>
+            </div>
+            <div class="action-buttons" style="margin-top:5px;">
+                <button class="action-btn btn-pass" onclick="passBid()">PASS</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- East Player -->
+    <div class="player-area p-east" id="area-east">
+        <div class="trump-indicator" id="ind-east" style="display:none;"></div>
+        <div class="player-info" id="label-east">
+            EAST (AI)
+            <div id="deal-light-east" class="indicator-light" title="Dealer"></div>
+        </div>
+        
+        <div class="book-indicators" id="books-ind-east">
+            <div class="book-light"></div><div class="book-light"></div><div class="book-light"></div><div class="book-light"></div><div class="book-light"></div>
+        </div>
+
+        <div class="stats-row" style="margin-top:5px;">
+            <div class="stat-box">Rounds: <span id="rounds-east">0</span></div>
+        </div>
+        <div class="hand-container hand-vertical" id="hand-east"></div>
+    </div>
+
+    <!-- South Player (Human) -->
+    <div class="player-area p-south" id="area-south">
+        <div class="player-info" id="label-south">
+            SOUTH (YOU)
+            <div id="deal-light-south" class="indicator-light" title="Dealer"></div>
+        </div>
+        <div class="trump-indicator" id="ind-south" style="display:none;"></div>
+        
+        <div class="book-indicators" id="books-ind-south">
+            <div class="book-light"></div><div class="book-light"></div><div class="book-light"></div><div class="book-light"></div><div class="book-light"></div>
+        </div>
+
+        <div class="stats-row" style="margin-top:5px;">
+            <div class="stat-box">Rounds: <span id="rounds-south">0</span></div>
+        </div>
+        <div class="hand-container hand-horizontal" id="hand-south"></div>
+    </div>
+</div>
+
+<!-- Chat Widget -->
+<div id="chatWidget" class="chat-widget">
+    <div class="chat-header">
+        <span>Euchre AI Assistant</span>
+        <span class="chat-close" onclick="toggleChat()">X</span>
+    </div>
+    <div class="chat-body" id="chatBody">
+        <div class="chat-msg ai">Hello! Ask me about Euchre rules, strategy, or rankings!</div>
+    </div>
+    <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="Type a question..." onkeypress="handleChatEnter(event)">
+        <button onclick="sendChat()">Send</button>
+    </div>
+</div>
+
+<script>
+    // --- CONFIG ---
+    const SUITS = ['♠', '♣', '♥', '♦'];
+    // Rank map: 0-5 (low to high) for standard cards
+    // Values used for power calculation:
+    // Non-Trump: 9=0, 10=1, Q=2, K=3, A=4, J=5 (unless left bower)
+    // Trump: Left Bower=20, Right Bower=30, A=10, K=8, Q=6, 10=4, 9=2
+    
+    const RANKS = ['9', '10', 'Q', 'K', 'A', 'J']; 
+    const RANK_POWER = { '9': 2, '10': 4, 'J': 5, 'Q': 6, 'K': 8, 'A': 10 };
+    
+    const PLAYERS = ['south', 'west', 'north', 'east'];
+
+    // MULTIPLAYER VARIABLES
+    let mpPeer = null;
+    let mpMyId = null;
+    let mpConnections = {};
+    let mpIsHost = false;
+    let mpPlayerPosition = 'south'; // south, west, north, east
+    let mpPositionMap = {}; // Maps peer IDs to positions
+    let mpMultiplayerActive = false; // Track if we're in multiplayer mode
+
+    // --- STATE ---
+    const game = {
+        deck: [],
+        hands: { south: [], west: [], north: [], east: [] },
+        trick: [],
+        
+        scores: { team1: 0, team2: 0 },
+        books: { south: 0, west: 0, north: 0, east: 0 }, 
+        roundsPlayed: 0,
+        
+        dealerIndex: 0,
+        currentPlayerIndex: 0,
+        
+        phase: 'bidding', 
+        turnState: 0, 
+        
+        trumpSuit: null,
+        kittyCard: null,
+        passCount: 0,
+        
+        trainingMode: false,
+        expertMode: false, // NEW
+        recommendedCardIndex: -1,
+        trumpCaller: null
+    };
+
+    // --- UTILS ---
+    function msg(text) { document.getElementById('message').textContent = text; }
+    function trainingTip(text) { 
+        const el = document.getElementById('trainingTip');
+        el.textContent = text;
+        el.style.display = game.trainingMode ? 'block' : 'none';
+    }
+    
+    function updateBannerStatus() {
+        const el = document.getElementById('bannerStatus');
+        if (!el) return;
+        
+        if (game.trumpSuit && game.trumpCaller) {
+            el.innerHTML = `<span style="color:#${game.trumpSuit==='♥'||game.trumpSuit==='♦'?'ff5555':'55ffff'}">Trump: ${game.trumpSuit}</span> | Called by: ${game.trumpCaller.toUpperCase()}`;
+        } else {
+            el.textContent = "No Trump Called";
+        }
+    }
+
+    function updateBookIndicators() {
+        PLAYERS.forEach(p => {
+            const container = document.getElementById(`books-ind-${p}`);
+            if(!container) return;
+            const lights = container.children;
+            const count = game.books[p];
+            for(let i=0; i<5; i++) {
+                if(i < count) lights[i].classList.add('won');
+                else lights[i].classList.remove('won');
+            }
+        });
+    }
+
+    function updateScoreboard() {
+        const t1El = document.getElementById('score-team1');
+        const t2El = document.getElementById('score-team2');
+        if (t1El) t1El.textContent = game.scores.team1;
+        if (t2El) t2El.textContent = game.scores.team2;
+    }
+
+    function getTeam(p) {
+        if (p === 'south' || p === 'north') return 'team1';
+        return 'team2';
+    }
+
+    function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } }
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // --- CARD RANKING LOGIC ---
+    
+    function getCardPower(card, trump) {
+        // Returns numeric power for comparison. Higher is better.
+        if (!trump) return RANK_POWER[card.rank] || 0;
+
+        const isTrump = (card.suit === trump);
+        const isLeftBower = (card.rank === 'J' && isSuitSameColor(card.suit, trump) && card.suit !== trump);
+
+        if (card.suit === trump) {
+            if (card.rank === 'J') return 30; // Right Bower
+            return RANK_POWER[card.rank];
+        }
+
+        if (isLeftBower) {
+            return 20; // Left Bower (acts as trump)
+        }
+
+        return RANK_POWER[card.rank];
+    }
+
+    function isSuitSameColor(s1, s2) {
+        const red = ['♥', '♦'];
+        const black = ['♠', '♣'];
+        return (red.includes(s1) && red.includes(s2)) || (black.includes(s1) && black.includes(s2));
+    }
+
+    function isValidPlay(card, player, trump) {
+        if (game.trick.length === 0) return true;
+        
+        const leadSuit = game.trick[0].card.suit;
+        const hand = game.hands[player];
+        
+        // Determine actual lead suit considering Left Bower
+        // If lead card is Left Bower (Jack of same color, different suit), it acts as Trump.
+        let effectiveLeadSuit = leadSuit;
+        if (game.trick[0].card.rank === 'J' && leadSuit !== trump && isSuitSameColor(leadSuit, trump)) {
+            effectiveLeadSuit = trump;
+        }
+
+        // If card being played is Left Bower, it effectively IS trump
+        let effectiveCardSuit = card.suit;
+        if (card.rank === 'J' && card.suit !== trump && isSuitSameColor(card.suit, trump)) {
+            effectiveCardSuit = trump;
+        }
+
+        if (effectiveCardSuit === effectiveLeadSuit) return true;
+
+        // Check if player has any card that matches the effective lead suit
+        const canFollow = hand.some(c => {
+             // If lead was a Left Bower, it acts as Trump, so we must follow Trump
+             if (effectiveLeadSuit === trump) {
+                 return (c.suit === trump) || (c.rank === 'J' && isSuitSameColor(c.suit, trump));
+             }
+             // Normal suit follow
+             return c.suit === effectiveLeadSuit;
+        });
+
+        if (canFollow && effectiveCardSuit !== effectiveLeadSuit) return false;
+        
+        return true;
+    }
+
+    // --- EXPERT AI LOGIC ---
+
+    function evaluateHandStrength(hand, trump) {
+        let points = 0;
+        hand.forEach(c => {
+            // Count Trumps and Aces
+            if (c.suit === trump) points += 2; // Trumps are valuable
+            if (c.suit !== trump && c.rank === 'A') points += 1.5; // Off-suit aces
+            if (c.rank === 'J' && isSuitSameColor(c.suit, trump) && c.suit !== trump) points += 2; // Left bower is trump
+        });
+        return points;
+    }
+
+    function aiOrderUpExpert(player, turnState) {
+        const suit = turnState === 0 ? game.kittyCard.suit : null;
+        // If turnState 1, we evaluate based on best suit
+        // Simplified: Check if we have 2.5+ points in the suit (or for turn 1, 2.5 in kitty suit)
+        
+        // For Turn 0 (Kitty):
+        let strength = 0;
+        if (turnState === 0) {
+            // Count trump (kitty suit) + Left Bower
+            const count = game.hands[player].filter(c => c.suit === suit || (c.rank==='J' && isSuitSameColor(c.suit, suit))).length;
+            strength = count * 1.5; // Each trump/bower is worth 1.5
+            // Add off-suit aces
+            const aces = game.hands[player].filter(c => c.rank === 'A' && !isSuitSameColor(c.suit, suit)).length;
+            strength += aces;
+        } 
+        
+        // Expert Threshold: 2.5 points to order up aggressively
+        // Normal Threshold: 2 points
+        const threshold = game.expertMode ? 2.5 : 2.0;
+        
+        if (strength >= threshold) return true;
+        return false;
+    }
+
+    function aiPlayCardExpert(player) {
+        const hand = game.hands[player];
+        const validCards = [];
+        const partner = getPartner(player);
+        
+        // Check partner cards played in previous tricks (simple memory for "partner has this suit")
+        // In a full implementation we'd track history. For now, we use basic logic.
+        
+        hand.forEach((c, i) => {
+            if (isValidPlay(c, player, game.trumpSuit)) validCards.push({ card: c, index: i });
+        });
+        
+        if (validCards.length === 0) return 0; // Should not happen
+
+        // Sort by power desc
+        validCards.sort((a, b) => getCardPower(b.card, game.trumpSuit) - getCardPower(a.card, game.trumpSuit));
+
+        // 1. If we are first to lead
+        if (game.trick.length === 0) {
+            if (game.expertMode) {
+                // Expert Strategy: Lead highest non-trump if partner not void, or highest trump if going alone
+                // Simplified: Lead highest card generally, but avoid wasting trump if we have many
+                // Try to lead an Ace if we have one to force out high cards
+                const aceLead = validCards.find(v => v.card.rank === 'A' && v.card.suit !== game.trumpSuit);
+                if (aceLead) return aceLead.index;
+                
+                return validCards[0].index; // Lead highest otherwise
+            }
+            return validCards[0].index;
+        }
+
+        // 2. If we are following
+        const currentWinningPlay = getCurrentWinner();
+        const amIWinning = (currentWinningPlay.player === player);
+        const isPartnerWinning = (currentWinningPlay.player === partner);
+
+        if (game.expertMode) {
+            // Expert Logic:
+            // If partner is winning, play LOW (don't overtake partner unless necessary, or save high cards)
+            if (isPartnerWinning) {
+                // Play lowest valid card
+                validCards.sort((a, b) => getCardPower(a.card, game.trumpSuit) - getCardPower(b.card, game.trumpSuit));
+                return validCards[0].index;
+            }
+
+            // If opponent is winning
+            // Can we beat the current winner?
+            const winningPower = getCardPower(currentWinningPlay.card, game.trumpSuit);
+            const bestBeater = validCards.find(v => getCardPower(v.card, game.trumpSuit) > winningPower);
+            
+            if (bestBeater) {
+                // Win with the lowest card that beats them (efficiency)
+                const beaters = validCards.filter(v => getCardPower(v.card, game.trumpSuit) > winningPower);
+                beaters.sort((a, b) => getCardPower(a.card, game.trumpSuit) - getCardPower(b.card, game.trumpSuit));
+                return beaters[0].index;
+            } else {
+                // Can't win. Throw off lowest card.
+                validCards.sort((a, b) => getCardPower(a.card, game.trumpSuit) - getCardPower(b.card, game.trumpSuit));
+                return validCards[0].index;
+            }
+        }
+
+        // Fallback to simple highest card
+        return validCards[0].index;
+    }
+
+    function getCurrentWinner() {
+        if (game.trick.length === 0) return null;
+        let w = game.trick[0];
+        game.trick.forEach(play => {
+            const cPower = getCardPower(play.card, game.trumpSuit);
+            const wPower = getCardPower(w.card, game.trumpSuit);
+            if (cPower > wPower) w = play;
+        });
+        return w;
+    }
+
+    function getPartner(player) {
+        if (player === 'south') return 'north';
+        if (player === 'north') return 'south';
+        if (player === 'west') return 'east';
+        if (player === 'east') return 'west';
+    }
+
+    // --- SETUP ---
+    function newGame() {
+        game.scores = { team1: 0, team2: 0 };
+        game.roundsPlayed = 0;
+        game.books = { south: 0, west: 0, north: 0, east: 0 };
+        game.dealerIndex = 0; 
+        game.trumpCaller = null;
+        updateBannerStatus();
+        updateBookIndicators();
+        updateScoreboard();
+        
+        PLAYERS.forEach(p => {
+            document.getElementById(`rounds-${p}`).textContent = '0';
+            document.getElementById(`deal-light-${p}`).className = 'indicator-light';
+        });
+        
+        startHand();
+    }
+
+    function toggleTraining() {
+        game.trainingMode = !game.trainingMode;
+        const btn = document.getElementById('btnTraining');
+        btn.textContent = `Training Mode: ${game.trainingMode ? 'ON' : 'OFF'}`;
+        btn.classList.toggle('active');
+        if(game.trainingMode) {
+            analyzeTurn(); 
+        } else {
+            trainingTip("");
+        }
+        updateUI();
+    }
+
+    function toggleExpert() {
+        game.expertMode = !game.expertMode;
+        const btn = document.getElementById('btnExpert');
+        btn.textContent = `Expert Mode: ${game.expertMode ? 'ON' : 'OFF'}`;
+        btn.classList.toggle('active');
+        // Expert implies training is usually off, but can be both
+    }
+
+    function toggleChat() {
+        const w = document.getElementById('chatWidget');
+        w.style.display = (w.style.display === 'flex') ? 'none' : 'flex';
+    }
+
+    function handleChatEnter(e) {
+        if(e.key === 'Enter') sendChat();
+    }
+
+    function sendChat() {
+        const input = document.getElementById('chatInput');
+        const text = input.value.trim();
+        if(!text) return;
+        
+        addChatMsg(text, 'user');
+        input.value = '';
+
+        setTimeout(() => {
+            let response = "I'm not sure about that, but in Euchre, the Jack of the trump suit is the highest card.";
+            const lower = text.toLowerCase();
+            
+            if(lower.includes('trump') && lower.includes('jack')) response = "The Jack of the trump suit is the Right Bower, the highest card. The Jack of the same color is the Left Bower, the second highest.";
+            else if(lower.includes('left bower')) response = "The Left Bower is the Jack of the same color as the trump suit (e.g., if trump is Hearts, the Jack of Diamonds is the Left Bower). It counts as a trump card.";
+            else if(lower.includes('order up')) response = "If the turned-up card is your suit and you have a strong hand, you should 'Order Up' the dealer. If you are the dealer, you must pick it up.";
+            else if(lower.includes('euchre')) response = "A 'Euchre' happens when the team that picks trump fails to win at least 3 tricks. The opposing team gets 2 points.";
+            else if(lower.includes('score')) response = "Standard scoring is: 1 point for winning 3 or 4 tricks. 2 points for winning all 5 tricks (a March). 2 points for a Euchre.";
+            else if(lower.includes('lead')) response = "Usually lead with your highest card if you are strong in that suit, or a singleton to draw out trumps. If you have the Right Bower, lead it!";
+            
+            addChatMsg(response, 'ai');
+        }, 600);
+    }
+
+    function addChatMsg(text, sender) {
+        const body = document.getElementById('chatBody');
+        const div = document.createElement('div');
+        div.className = `chat-msg ${sender}`;
+        div.textContent = text;
+        body.appendChild(div);
+        body.scrollTop = body.scrollHeight;
+    }
+
+    function startHand() {
+        game.deck = [];
+        game.trick = [];
+        game.trumpSuit = null;
+        game.kittyCard = null;
+        game.passCount = 0;
+        game.phase = 'bidding';
+        game.turnState = 0;
+        game.books = { south: 0, west: 0, north: 0, east: 0 }; 
+        game.recommendedCardIndex = -1;
+        game.trumpCaller = null;
+        updateBannerStatus();
+        updateBookIndicators();
+
+        game.roundsPlayed++;
+        PLAYERS.forEach(p => {
+            document.getElementById(`rounds-${p}`).textContent = game.roundsPlayed;
+        });
+
+        game.dealerIndex = (game.dealerIndex + 1) % 4;
+        
+        let id = 0;
+        SUITS.forEach(s => RANKS.forEach(r => {
+            game.deck.push({ id: id++, rank: r, suit: s });
+        }));
+        shuffle(game.deck);
+
+        PLAYERS.forEach(p => { game.hands[p] = []; });
+        
+        for(let i=0; i<4; i++) {
+            for(let j=0; j<5; j++) {
+                if(game.deck.length) game.hands[PLAYERS[i]].push(game.deck.pop());
+            }
+        }
+        game.kittyCard = game.deck.pop();
+
+        game.currentPlayerIndex = (game.dealerIndex + 1) % 4;
+        
+        updateUI();
+        msg(`Hand started. Dealer: ${PLAYERS[game.dealerIndex].toUpperCase()}.`);
+        
+        processTurn();
+    }
+
+    // --- GAME LOGIC ---
+
+    function analyzeTurn() {
+        if (!game.trainingMode) return;
+
+        if (game.phase === 'bidding') {
+            if (game.turnState === 0) {
+                const suit = game.kittyCard.suit;
+                const count = game.hands.south.filter(c => c.suit === suit || (c.rank==='J' && isSuitSameColor(c.suit, suit))).length;
+                if (count >= 2) {
+                    trainingTip(`Strategy: You have ${count} ${suit}s including bowers. You should Order Up.`);
+                } else {
+                    trainingTip(`Strategy: You are weak in ${suit}. Passing is usually safer unless you have high void suits.`);
+                }
+            } else if (game.turnState === 1) {
+                trainingTip(`Strategy: Pick a suit where you have 3 or more cards, preferably including a Jack or Ace.`);
+            }
+        } else if (game.phase === 'playing' && PLAYERS[game.currentPlayerIndex] === 'south') {
+            if (game.trick.length === 0) {
+                trainingTip(`Strategy: You are leading. Play a high card to force out opponents' high cards, or a singleton to cut through.`);
+                let bestIdx = 0;
+                let bestVal = -1;
+                game.hands.south.forEach((c, i) => {
+                    const val = getCardPower(c, game.trumpSuit);
+                    if (val > bestVal) { bestVal = val; bestIdx = i; }
+                });
+                game.recommendedCardIndex = bestIdx;
+            } else {
+                const leadCard = game.trick[0].card;
+                const leadSuit = leadCard.suit; // Natural suit
+                
+                // Identify effective lead suit
+                let effectiveLead = leadSuit;
+                if (leadCard.rank === 'J' && leadSuit !== game.trumpSuit && isSuitSameColor(leadSuit, game.trumpSuit)) {
+                    effectiveLead = game.trumpSuit;
+                }
+
+                const hasLead = game.hands.south.some(c => {
+                    if (effectiveLead === game.trumpSuit) {
+                        return (c.suit === game.trumpSuit) || (c.rank === 'J' && isSuitSameColor(c.suit, game.trumpSuit));
+                    }
+                    return c.suit === effectiveLead;
+                });
+
+                if (hasLead) {
+                    trainingTip(`Rule: You must follow suit! Try to play higher than the current winner if possible.`);
+                    // Find best following card
+                    let bestIdx = -1;
+                    let bestVal = -1;
+                    game.hands.south.forEach((c, i) => {
+                        // Check if card follows
+                        let cFollow = false;
+                        if (effectiveLead === game.trumpSuit) {
+                            cFollow = (c.suit === game.trumpSuit) || (c.rank === 'J' && isSuitSameColor(c.suit, game.trumpSuit));
+                        } else {
+                            cFollow = (c.suit === effectiveLead);
+                        }
+
+                        if (cFollow) {
+                            const val = getCardPower(c, game.trumpSuit);
+                            if (val > bestVal) { bestVal = val; bestIdx = i; }
+                        }
+                    });
+                    game.recommendedCardIndex = bestIdx;
+                } else {
+                    trainingTip(`Rule: You don't have the lead suit. You can play trump to win (trumping), or throw off a low card.`);
+                    let bestIdx = 0;
+                    let bestVal = 100; // Lowest value wins here
+                    game.hands.south.forEach((c, i) => {
+                        const val = getCardPower(c, game.trumpSuit);
+                        if (val < bestVal) { bestVal = val; bestIdx = i; }
+                    });
+                    game.recommendedCardIndex = bestIdx;
+                }
+            }
+            updateUI();
+        }
+    }
+
+    async function processTurn() {
+        console.log('processTurn called - phase:', game.phase, 'turnState:', game.turnState, 'currentPlayer:', PLAYERS[game.currentPlayerIndex], 'mpActive:', mpMultiplayerActive);
+        
+        if (game.trainingMode) analyzeTurn();
+
+        if (game.phase === 'bidding') {
+            const player = PLAYERS[game.currentPlayerIndex];
+            const myPosition = mpMultiplayerActive ? mpPlayerPosition : 'south';
+            
+            console.log('Bidding phase - player:', player, 'myPosition:', myPosition);
+            
+            hideBiddingUI();
+
+            if (game.turnState === 0) {
+                if (player === myPosition) {
+                    showBiddingUI(true);
+                    msg(`${game.kittyCard.rank}${game.kittyCard.suit} turned up. Order it up?`);
+                } else if (!mpMultiplayerActive) {
+                    // Only run AI if NOT in multiplayer mode
+                    console.log('Running AI for player:', player);
+                    await sleep(1000);
+                    // Use Expert Logic if enabled
+                    if (game.expertMode && aiOrderUpExpert(player, 0)) {
+                        orderUpAI(player);
+                    } else {
+                        aiOrderUp(player);
+                    }
+                } else {
+                    // Multiplayer: waiting for other player
+                    msg(`Waiting for ${player.toUpperCase()} to bid...`);
+                }
+            } else if (game.turnState === 1) {
+                if (player === myPosition) {
+                    showBiddingUI(false);
+                    msg("Kitty passed. Pick a suit.");
+                } else if (!mpMultiplayerActive) {
+                    // Only run AI if NOT in multiplayer mode
+                    console.log('Running AI call suit for player:', player);
+                    await sleep(1000);
+                    aiCallSuit(player);
+                } else {
+                    // Multiplayer: waiting for other player
+                    msg(`Waiting for ${player.toUpperCase()} to call trump...`);
+                }
+            }
+        } else if (game.phase === 'playing') {
+            const player = PLAYERS[game.currentPlayerIndex];
+            const myPosition = mpMultiplayerActive ? mpPlayerPosition : 'south';
+            hideBiddingUI();
+            
+            console.log('Playing phase - player:', player, 'myPosition:', myPosition);
+            
+            document.querySelectorAll('.player-area').forEach(el => el.classList.remove('active-turn'));
+            document.getElementById(`area-${player}`).classList.add('active-turn');
+            
+            if (player === myPosition) {
+                msg("Your turn to play.");
+                updateUI();
+            } else if (!mpMultiplayerActive) {
+                // Only run AI if NOT in multiplayer mode
+                console.log('Running AI play card for player:', player);
+                await sleep(1000);
+                // Use Expert Logic if enabled
+                const cardIndex = game.expertMode ? aiPlayCardExpert(player) : aiPlayCard(player);
+                executePlay(player, cardIndex);
+            } else {
+                // Multiplayer: waiting for other player
+                msg(`Waiting for ${player.toUpperCase()} to play...`);
+            }
+        }
+    }
+
+    function showBiddingUI(isOrderUp) {
+        const box = document.getElementById('actionBox');
+        const title = document.getElementById('actionTitle');
+        const btnOrder = document.getElementById('btnOrderUp');
+        
+        box.style.display = 'flex';
+
+        if (isOrderUp) {
+            title.textContent = `Order up ${game.kittyCard.suit}?`;
+            btnOrder.style.display = 'inline-block';
+            btnOrder.className = 'action-btn btn-order';
+            btnOrder.textContent = `ORDER ${game.kittyCard.suit}`;
+        } else {
+            title.textContent = "Call Trump";
+            btnOrder.style.display = 'none';
+            
+            const suits = ['♥', '♣', '♦', '♠'];
+            const btnsContainer = box.querySelector('.action-buttons:first-child');
+            btnsContainer.innerHTML = ''; 
+            
+            suits.forEach(s => {
+                const b = document.createElement('button');
+                b.className = 'action-btn';
+                b.textContent = s;
+                b.style.color = (s === '♥' || s === '♦') ? '#ffaaaa' : '#ffffff';
+                b.onclick = () => selectSuit(s);
+                btnsContainer.appendChild(b);
+            });
+        }
+    }
+
+    function hideBiddingUI() {
+        document.getElementById('actionBox').style.display = 'none';
+    }
+
+    // AI Wrapper to call the global orderUp from AI logic
+    function orderUpAI(player) {
+        // This function is called when AI decides to order up in Expert Mode
+        // We temporarily manipulate current player index or just call logic directly
+        // Since processTurn sets the index, we just call the logic
+        // However, orderUp() in the UI sets trump and moves to play phase.
+        // We need to call the generic logic without UI interference
+        game.trumpSuit = game.kittyCard.suit;
+        game.trumpCaller = player;
+        
+        const dealer = PLAYERS[game.dealerIndex];
+        msg(`Trump is ${game.trumpSuit}. Called by ${player.toUpperCase()}. ${dealer.toUpperCase()} picks up.`);
+        updateBannerStatus();
+        
+        game.hands[dealer].push(game.kittyCard);
+        
+        let toDiscardIndex = 0;
+        let lowestVal = 100;
+        game.hands[dealer].forEach((c, i) => {
+            const val = getCardPower(c, game.trumpSuit);
+            // Prefer to discard non-trump low cards
+            if (c.suit !== game.trumpSuit && val < lowestVal) {
+                lowestVal = val;
+                toDiscardIndex = i;
+            }
+        });
+        game.hands[dealer].splice(toDiscardIndex, 1);
+        
+        game.phase = 'playing';
+        game.turnState = 2;
+        game.currentPlayerIndex = (game.dealerIndex + 1) % 4;
+        
+        updateUI();
+        processTurn();
+    }
+
+    function orderUp() {
+        if (mpMultiplayerActive && !mpIsMyTurn()) return;
+        
+        game.trumpSuit = game.kittyCard.suit;
+        game.trumpCaller = PLAYERS[game.currentPlayerIndex];
+        
+        const dealer = PLAYERS[game.dealerIndex];
+        msg(`Trump is ${game.trumpSuit}. Called by ${game.trumpCaller.toUpperCase()}. ${dealer.toUpperCase()} picks up.`);
+        updateBannerStatus();
+        
+        game.hands[dealer].push(game.kittyCard);
+        
+        if (dealer !== 'south') {
+            let toDiscardIndex = 0;
+            let lowestVal = 100;
+            game.hands[dealer].forEach((c, i) => {
+                const val = getCardPower(c, game.trumpSuit);
+                if (c.suit !== game.trumpSuit && val < lowestVal) {
+                    lowestVal = val;
+                    toDiscardIndex = i;
+                }
+            });
+            game.hands[dealer].splice(toDiscardIndex, 1);
+        } else {
+            msg("Auto-discarding a card.");
+            let toDiscardIndex = 0;
+            let lowestVal = 100;
+            game.hands[dealer].forEach((c, i) => {
+                const val = getCardPower(c, game.trumpSuit);
+                if (c.suit !== game.trumpSuit && val < lowestVal) {
+                    lowestVal = val;
+                    toDiscardIndex = i;
+                }
+            });
+            game.hands[dealer].splice(toDiscardIndex, 1);
+        }
+        
+        game.phase = 'playing';
+        game.turnState = 2;
+        game.currentPlayerIndex = (game.dealerIndex + 1) % 4;
+        
+        hideBiddingUI();
+        
+        if (mpMultiplayerActive) {
+            mpSyncGame();
+        }
+        
+        updateUI();
+        
+        // Only call processTurn in single-player
+        // In multiplayer, it will be called when sync is received
+        if (!mpMultiplayerActive) {
+            processTurn();
+        }
+    }
+
+    function passBid() {
+        if (mpMultiplayerActive && !mpIsMyTurn()) return;
+        
+        game.passCount++;
+        msg(`${PLAYERS[game.currentPlayerIndex].toUpperCase()} passed.`);
+        
+        if (game.turnState === 0 && game.passCount >= 4) {
+            game.turnState = 1;
+            game.passCount = 0;
+            game.currentPlayerIndex = (game.dealerIndex + 1) % 4;
+            msg("Kitty passed. Choose a suit.");
+            
+            if (mpMultiplayerActive) mpSyncGame();
+            
+            updateUI();
+            
+            if (!mpMultiplayerActive) {
+                processTurn();
+            }
+        } else if (game.turnState === 1 && game.passCount >= 4) {
+            msg("Screw the dealer! Forced to choose.");
+            const dealer = PLAYERS[game.dealerIndex];
+            
+            if (mpMultiplayerActive) mpSyncGame();
+            
+            aiCallSuit(dealer, true); 
+        } else {
+            // Advance to next player
+            game.currentPlayerIndex = (game.currentPlayerIndex + 1) % 4;
+            
+            if (mpMultiplayerActive) mpSyncGame();
+            
+            if (!mpMultiplayerActive) {
+                processTurn();
+            }
+        }
+    }
+
+    function selectSuit(suit) {
+        if (mpMultiplayerActive && !mpIsMyTurn()) return;
+        
+        game.trumpSuit = suit;
+        game.trumpCaller = PLAYERS[game.currentPlayerIndex];
+        msg(`Trump is ${game.trumpSuit}. Called by ${game.trumpCaller.toUpperCase()}.`);
+        updateBannerStatus();
+        
+        game.phase = 'playing';
+        game.turnState = 2;
+        game.currentPlayerIndex = (game.dealerIndex + 1) % 4;
+        hideBiddingUI();
+        
+        if (mpMultiplayerActive) mpSyncGame();
+        
+        updateUI();
+        
+        if (!mpMultiplayerActive) {
+            processTurn();
+        }
+    }
+
+    function playCard(cardIndex) {
+        if (mpMultiplayerActive && !mpIsMyTurn()) return;
+        
+        const player = PLAYERS[game.currentPlayerIndex];
+        const myPosition = mpMultiplayerActive ? mpPlayerPosition : 'south';
+        
+        if (player !== myPosition) return;
+        if (game.phase !== 'playing') return;
+
+        const card = game.hands[myPosition][cardIndex];
+        
+        if (!isValidPlay(card, myPosition, game.trumpSuit)) {
+            msg("You must follow suit!");
+            return;
+        }
+
+        executePlay(myPosition, cardIndex);
+    }
+
+    function executePlay(player, cardIndex) {
+        const card = game.hands[player].splice(cardIndex, 1)[0];
+        game.trick.push({ player, card });
+        
+        if(player === 'south') game.recommendedCardIndex = -1;
+        
+        updateUI();
+
+        if (game.trick.length === 4) {
+            setTimeout(resolveTrick, 1000);
+        } else {
+            // Advance to next player
+            game.currentPlayerIndex = (game.currentPlayerIndex + 1) % 4;
+            
+            // In multiplayer, sync the state after advancing
+            if (mpMultiplayerActive) {
+                mpSyncGame();
+            }
+            
+            // In single-player, call processTurn directly
+            // In multiplayer, processTurn will be called when sync is received
+            if (!mpMultiplayerActive) {
+                processTurn();
+            }
+        }
+    }
+
+    function aiOrderUp(player) {
+        const suit = game.kittyCard.suit;
+        const count = game.hands[player].filter(c => c.suit === suit || (c.rank==='J' && isSuitSameColor(c.suit, suit))).length;
+        console.log('aiOrderUp -', player, 'has', count, 'cards in', suit);
+        if (count >= 2) {
+            console.log(player, 'ordering up!');
+            orderUp();
+        } else {
+            console.log(player, 'passing');
+            passBid();
+        }
+    }
+
+    function aiCallSuit(player, force = false) {
+        if (force) {
+            const counts = { '♠':0, '♣':0, '♥':0, '♦':0 };
+            game.hands[player].forEach(c => { 
+                if(c.suit !== game.kittyCard.suit) counts[c.suit]++; 
+            });
+            let bestSuit = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+            if(bestSuit === game.kittyCard.suit) {
+                 const remaining = Object.keys(counts).filter(s => s !== game.kittyCard.suit);
+                 bestSuit = remaining[0];
+            }
+            selectSuit(bestSuit);
+        } else {
+            const counts = { '♠':0, '♣':0, '♥':0, '♦':0 };
+            game.hands[player].forEach(c => { if(c.suit !== game.kittyCard.suit) counts[c.suit]++; });
+            let bestSuit = null;
+            for(let s in counts) {
+                if(counts[s] >= 3) bestSuit = s;
+            }
+            if(bestSuit) selectSuit(bestSuit);
+            else passBid();
+        }
+    }
+
+    function aiPlayCard(player) {
+        const hand = game.hands[player];
+        const validCards = [];
+        
+        hand.forEach((c, i) => {
+            if (isValidPlay(c, player, game.trumpSuit)) validCards.push({ card: c, index: i });
+        });
+        
+        if (validCards.length === 0) {
+            return 0; 
+        }
+
+        validCards.sort((a, b) => getCardPower(b.card, game.trumpSuit) - getCardPower(a.card, game.trumpSuit));
+        return validCards[0].index;
+    }
+
+    function nextPlayer() {
+        game.currentPlayerIndex = (game.currentPlayerIndex + 1) % 4;
+        processTurn();
+    }
+
+    function resolveTrick() {
+        let winningPlay = game.trick[0];
+        
+        game.trick.forEach(play => {
+            const c = play.card;
+            const w = winningPlay.card;
+            
+            const cPower = getCardPower(c, game.trumpSuit);
+            const wPower = getCardPower(w, game.trumpSuit);
+            
+            const cSuitEffective = (c.rank === 'J' && c.suit !== game.trumpSuit && isSuitSameColor(c.suit, game.trumpSuit)) ? game.trumpSuit : c.suit;
+            const wSuitEffective = (w.rank === 'J' && w.suit !== game.trumpSuit && isSuitSameColor(w.suit, game.trumpSuit)) ? game.trumpSuit : w.suit;
+            
+            const leadSuitEffective = (game.trick[0].card.rank === 'J' && game.trick[0].card.suit !== game.trumpSuit && isSuitSameColor(game.trick[0].card.suit, game.trumpSuit)) ? game.trumpSuit : game.trick[0].card.suit;
+
+            const cIsTrump = (cSuitEffective === game.trumpSuit);
+            const wIsTrump = (wSuitEffective === game.trumpSuit);
+            
+            if (cIsTrump && !wIsTrump) {
+                winningPlay = play;
+            } else if (!cIsTrump && wIsTrump) {
+                // W remains winner
+            } else if (cIsTrump && wIsTrump) {
+                if (cPower > wPower) winningPlay = play;
+            } else {
+                const cMatchesLead = (cSuitEffective === leadSuitEffective);
+                const wMatchesLead = (wSuitEffective === leadSuitEffective);
+                
+                if (cMatchesLead && !wMatchesLead) {
+                    winningPlay = play;
+                } else if (!cMatchesLead && wMatchesLead) {
+                    // W remains
+                } else if (cMatchesLead && wMatchesLead) {
+                    if (cPower > wPower) winningPlay = play;
+                } else {
+                    if (cPower > wPower) winningPlay = play;
+                }
+            }
+        });
+
+        const winner = winningPlay.player;
+        msg(`${winner.toUpperCase()} takes the trick.`);
+        game.books[winner]++;
+        updateBookIndicators();
+        
+        game.trick = [];
+        game.currentPlayerIndex = PLAYERS.indexOf(winner);
+        
+        // Sync after trick resolution in multiplayer
+        if (mpMultiplayerActive) {
+            mpSyncGame();
+        }
+        
+        if (game.hands.south.length === 0) {
+            endHand();
+        } else {
+            updateUI();
+            
+            // Only call processTurn in single-player
+            // In multiplayer, it will be called when sync is received
+            if (!mpMultiplayerActive) {
+                setTimeout(processTurn, 500);
+            }
+        }
+    }
+
+    function endHand() {
+        // Calculate Score
+        // Team 1: South + North
+        // Team 2: West + East
+        const t1Books = game.books.south + game.books.north;
+        const t2Books = game.books.west + game.books.east;
+
+        let points = 0;
+        let winningTeam = '';
+
+        // Check who called trump
+        const t1Called = (game.trumpCaller === 'south' || game.trumpCaller === 'north');
+        
+        if (t1Called) {
+            if (t1Books >= 3 && t1Books < 5) {
+                points = 1;
+                winningTeam = 'team1';
+                msg("Team 1 wins 1 point!");
+            } else if (t1Books === 5) {
+                points = 2;
+                winningTeam = 'team1';
+                msg("Team 1 March! Wins 2 points!");
+            } else {
+                points = 2;
+                winningTeam = 'team2';
+                msg("Euchred! Team 2 wins 2 points!");
+            }
+        } else {
+            if (t2Books >= 3 && t2Books < 5) {
+                points = 1;
+                winningTeam = 'team2';
+                msg("Team 2 wins 1 point!");
+            } else if (t2Books === 5) {
+                points = 2;
+                winningTeam = 'team2';
+                msg("Team 2 March! Wins 2 points!");
+            } else {
+                points = 2;
+                winningTeam = 'team1';
+                msg("Euchred! Team 1 wins 2 points!");
+            }
+        }
+
+        if (winningTeam === 'team1') game.scores.team1 += points;
+        else game.scores.team2 += points;
+
+        updateScoreboard();
+
+        // Check Match Win (Standard 10 points)
+        if (game.scores.team1 >= 10) {
+            msg("🎉 TEAM 1 WINS THE MATCH! 🎉");
+            setTimeout(() => {
+                if(confirm("Team 1 Wins! Play again?")) newGame();
+            }, 1000);
+            return;
+        } else if (game.scores.team2 >= 10) {
+            msg("🎉 TEAM 2 WINS THE MATCH! 🎉");
+            setTimeout(() => {
+                if(confirm("Team 2 Wins! Play again?")) newGame();
+            }, 1000);
+            return;
+        }
+
+        msg("Hand over! Starting new hand...");
+        setTimeout(startHand, 2000);
+    }
+
+    // --- UI ---
+    function updateUI() {
+        PLAYERS.forEach(p => {
+            const roundsEl = document.getElementById(`rounds-${p}`);
+            if (roundsEl) roundsEl.textContent = game.roundsPlayed;
+            
+            const light = document.getElementById(`deal-light-${p}`);
+            if (light) {
+                if(game.dealerIndex === PLAYERS.indexOf(p)) light.className = 'indicator-light light-deal-on';
+                else light.className = 'indicator-light';
+            }
+        });
+
+        PLAYERS.forEach(p => renderHand(p));
+        
+        // Render kitty card during bidding
+        const kittyDisplay = document.getElementById('kittyDisplay');
+        const kittyCardEl = document.getElementById('kittyCard');
+        if (kittyDisplay && kittyCardEl) {
+            if (game.phase === 'bidding' && game.kittyCard) {
+                kittyDisplay.style.display = 'block';
+                const col = (game.kittyCard.suit==='♥'||game.kittyCard.suit==='♦')?'card-red':'card-black';
+                kittyCardEl.className = `card card-h ${col}`;
+                kittyCardEl.innerHTML = `<div style="font-size:14px;">${game.kittyCard.rank}</div><div style="font-size:24px;">${game.kittyCard.suit}</div>`;
+            } else {
+                kittyDisplay.style.display = 'none';
+            }
+        }
+
+        const tArea = document.getElementById('trickArea');
+        if (tArea) {
+            tArea.innerHTML = '';
+            game.trick.forEach(play => {
+                const el = document.createElement('div');
+                el.className = `card trick-card trick-${play.player}`;
+                const col = (play.card.suit==='♥'||play.card.suit==='♦')?'card-red':'card-black';
+                el.classList.add(col);
+                el.innerHTML = `<div style="font-size:12px;">${play.card.rank}</div><div style="font-size:20px;">${play.card.suit}</div>`;
+                tArea.appendChild(el);
+            });
+        }
+
+        if(game.trumpSuit) {
+            PLAYERS.forEach(p => {
+                const ind = document.getElementById(`ind-${p}`);
+                if (ind) {
+                    ind.style.display = 'flex';
+                    ind.textContent = game.trumpSuit;
+                    ind.className = 'trump-indicator';
+                    if(game.trumpSuit==='♥'||game.trumpSuit==='♦') ind.classList.add('card-red');
+                    else ind.classList.add('card-black');
+                }
+            });
+        }
+
+        if(game.phase === 'playing') {
+             document.querySelectorAll('.player-area').forEach(el => el.classList.remove('active-turn'));
+             const activeArea = document.getElementById(`area-${PLAYERS[game.currentPlayerIndex]}`);
+             if (activeArea) activeArea.classList.add('active-turn');
+        }
+    }
+
+    function renderHand(player) {
+        const hEl = document.getElementById(`hand-${player}`);
+        if (!hEl) return; // Element doesn't exist, skip rendering
+        
+        hEl.innerHTML = '';
+        const hand = game.hands[player];
+        if (!hand) return; // No hand data, skip
+        
+        // In multiplayer, only show own hand details. Others see card backs.
+        const isMyHand = mpMultiplayerActive ? (player === mpPlayerPosition) : (player === 'south');
+        
+        hand.forEach((card, index) => {
+            const cEl = document.createElement('div');
+            const orient = (player === 'south' || player === 'north') ? 'card-h' : 'card-v';
+            cEl.className = `card ${orient}`;
+
+            if (!isMyHand) {
+                cEl.classList.add('card-back');
+            } else {
+                const col = (card.suit==='♥'||card.suit==='♦')?'card-red':'card-black';
+                cEl.classList.add(col);
+                cEl.innerHTML = `<div style="font-size:12px;">${card.rank}</div><div style="font-size:20px;">${card.suit}</div>`;
+                
+                if (game.trainingMode && index === game.recommendedCardIndex) {
+                    cEl.classList.add('training-halo');
+                }
+
+                cEl.onclick = () => {
+                    // In single-player mode, only south can click
+                    // In multiplayer mode, only the current player matching their position can click
+                    const myPosition = mpMultiplayerActive ? mpPlayerPosition : 'south';
+                    if (game.phase === 'playing' && player === myPosition && isMyTurn()) {
+                        playCard(index);
+                    }
+                };
+            }
+            hEl.appendChild(cEl);
+        });
+    }
+
+    // =================================================================
+    // MULTIPLAYER FUNCTIONS
+    // =================================================================
+
+    function mpInit() {
+        console.log('Initializing multiplayer...');
+        mpPeer = new Peer();
+        
+        mpPeer.on('open', (id) => {
+            mpMyId = id;
+            document.getElementById('mpMyId').textContent = id;
+            console.log('My ID:', id);
+        });
+        
+        mpPeer.on('connection', (conn) => {
+            console.log('Incoming connection:', conn.peer);
+            mpSetupConnection(conn);
+        });
+    }
+    
+    function showMultiplayerLobby() {
+        const lobby = document.getElementById('mpLobby');
+        lobby.classList.add('active');
+        lobby.style.display = 'flex';
+    }
+
+    function mpSetupConnection(conn) {
+        mpConnections[conn.peer] = conn;
+        
+        conn.on('open', () => {
+            console.log('Connected to:', conn.peer);
+            mpUpdateList();
+            conn.send({ type: 'hello', from: mpMyId });
+        });
+        
+        conn.on('data', (data) => {
+            console.log('Received:', data);
+            mpHandleMessage(data);
+        });
+        
+        conn.on('close', () => {
+            console.log('Disconnected:', conn.peer);
+            delete mpConnections[conn.peer];
+            mpUpdateList();
+        });
+    }
+
+    function mpBecomeHost() {
+        mpIsHost = true;
+        mpPlayerPosition = 'south';
+        mpPositionMap[mpMyId] = 'south';
+        
+        document.getElementById('mpHostBtn').disabled = true;
+        document.getElementById('mpHostBtn').textContent = '✅ You are HOST';
+        document.getElementById('mpHostBtn').style.background = '#2ecc71';
+        mpUpdateList();
+    }
+
+    function mpJoinHost() {
+        const hostId = document.getElementById('mpHostInput').value.trim();
+        if (!hostId) { alert('Enter host ID!'); return; }
+        if (hostId === mpMyId) { alert('Cannot connect to self!'); return; }
+        
+        const conn = mpPeer.connect(hostId, { reliable: true });
+        mpSetupConnection(conn);
+        
+        document.getElementById('mpJoinBtn').disabled = true;
+        document.getElementById('mpJoinBtn').textContent = '✅ Connected';
+    }
+
+    function mpUpdateList() {
+        const list = document.getElementById('mpConnections');
+        const startArea = document.getElementById('mpStartArea');
+        const total = Object.keys(mpConnections).length + 1;
+        
+        let html = '<strong style="color:#ffd700;">Connected:</strong><br><br>';
+        html += `<div class="mp-connection">${mpIsHost ? '👑 You (Host)' : 'You'}</div>`;
+        
+        Object.keys(mpConnections).forEach(id => {
+            html += `<div class="mp-connection">Player ${id.substring(0,8)}</div>`;
+        });
+        
+        html += `<br><div style="text-align:center; font-size:20px; color:#00ffff;">${total}/4 Players</div>`;
+        list.innerHTML = html;
+        
+        if (mpIsHost && total >= 4) {
+            startArea.innerHTML = '<button onclick="mpStartGame()" class="btn-start-mp">🎮 START GAME</button>';
+        } else if (mpIsHost) {
+            startArea.innerHTML = `<div style="color:#888; padding:15px;">Waiting for ${4-total} more...</div>`;
+        } else {
+            startArea.innerHTML = '<div style="color:#888; padding:15px;">Host will start game...</div>';
+        }
+    }
+
+    function mpStartGame() {
+        if (!mpIsHost) return;
+        if (Object.keys(mpConnections).length < 3) {
+            alert('Need 4 players!');
+            return;
+        }
+        
+        // Enable multiplayer mode
+        mpMultiplayerActive = true;
+        
+        // Assign positions
+        const positions = ['west', 'north', 'east'];
+        let idx = 0;
+        for (let peerId in mpConnections) {
+            mpPositionMap[peerId] = positions[idx++];
+        }
+        
+        // Send position assignments to all players
+        Object.entries(mpPositionMap).forEach(([peerId, position]) => {
+            // Send to each peer their position
+            if (mpConnections[peerId]) {
+                mpConnections[peerId].send({ type: 'position', peerId: peerId, position: position });
+            }
+        });
+        
+        // Wait for all position messages to be received before starting
+        setTimeout(() => {
+            // Now broadcast start to everyone
+            mpBroadcast({ type: 'start' });
+            
+            // Host starts game immediately
+            mpShowGame();
+        }, 200);
+        
+        // Update labels based on position
+        PLAYERS.forEach(p => {
+            const label = document.getElementById(`label-${p}`);
+            if (label) {
+                label.textContent = p.toUpperCase() + (p === mpPlayerPosition ? ' (YOU)' : '');
+            }
+        });	
+    }
+
+    function mpShowGame() {
+        console.log('Hiding lobby...');
+        const lobby = document.getElementById('mpLobby');
+        if (lobby) {
+            lobby.style.display = 'none';
+            lobby.style.visibility = 'hidden';
+            lobby.style.opacity = '0';
+            lobby.style.pointerEvents = 'none';
+        }
+        newGame();
+    }
+
+    function mpBroadcast(data, excludePeerId = null) {
+        Object.entries(mpConnections).forEach(([peerId, conn]) => {
+            if (conn.open && peerId !== excludePeerId) {
+                conn.send(data);
+            }
+        });
+    }
+
+    function mpHandleMessage(data) {
+        if (data.type === 'hello') {
+            console.log('Player joined');
+        }
+        else if (data.type === 'position') {
+            if (data.peerId === mpMyId) {
+                mpPlayerPosition = data.position;
+            }
+        }
+        else if (data.type === 'start') {
+            mpMultiplayerActive = true; 
+            mpShowGame();
+            // Update labels based on position for non-hosts
+            PLAYERS.forEach(p => {
+                const label = document.getElementById(`label-${p}`);
+                if (label) {
+                    label.textContent = p.toUpperCase() + (p === mpPlayerPosition ? ' (YOU)' : '');
+                }
+            });
+        }
+        else if (data.type === 'gameState') {
+            console.log('Received game state sync - currentPlayer:', PLAYERS[data.state.currentPlayerIndex], 'myPosition:', mpPlayerPosition);
+            
+            // Relay to other players if we are the host
+            if (mpIsHost) {
+                mpBroadcast(data, data.from);
+            }
+            
+            // Deep update game state
+            const newState = data.state;
+            for (let key in newState) {
+                game[key] = newState[key];
+            }
+            updateUI();
+            
+            // Only trigger processTurn if it's now MY turn
+            // This prevents both players from running processTurn simultaneously
+            const currentPlayer = PLAYERS[game.currentPlayerIndex];
+            if (currentPlayer === mpPlayerPosition) {
+                console.log('It is now my turn, calling processTurn');
+                processTurn();
+            } else {
+                console.log('Not my turn, waiting for', currentPlayer);
+            }
+        }
+    }
+
+    function mpSyncGame() {
+        mpBroadcast({
+            type: 'gameState',
+            from: mpMyId,
+            state: { ...game }
+        });
+    }
+
+    function mpGetCurrentPosition() {
+        return PLAYERS[game.currentPlayerIndex];
+    }
+
+    function mpIsMyTurn() {
+        // Check if current turn position matches my position
+        const currentPos = mpGetCurrentPosition();
+        return currentPos === mpPlayerPosition;
+    }
+
+    function isMyTurn() { 
+        if (mpMultiplayerActive) {
+            return mpIsMyTurn();
+        }
+        return true;
+    }
+
+    // Initialize multiplayer on load
+    mpInit();
+
+    // Auto-start single-player game after a brief delay
+    setTimeout(() => {
+        if (!mpMultiplayerActive) {
+            newGame();
+        }
+    }, 500);
+
+    msg('New Game ready!');
+</script>
+</body>
+</html>
