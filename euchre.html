@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>Kaplan Euchre</title>
     <style>
         * {
@@ -17,13 +17,15 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
         .nav-bar {
             background: linear-gradient(135deg, #00AA00 0%, #006600 100%);
-            padding: 15px 30px;
+            padding: 10px 15px;
             box-shadow: 0 2px 10px rgba(255, 215, 0, 0.3);
             border-bottom: 2px solid #FFD700;
+            flex-shrink: 0;
         }
 
         .nav-content {
@@ -37,9 +39,9 @@
         .home-link {
             color: #FFD700;
             text-decoration: none;
-            font-size: 1.2em;
+            font-size: 1em;
             font-weight: 600;
-            padding: 8px 20px;
+            padding: 6px 15px;
             border: 2px solid #FFD700;
             border-radius: 8px;
             transition: all 0.3s ease;
@@ -52,21 +54,48 @@
 
         .game-title {
             color: #FFD700;
-            font-size: 1.5em;
+            font-size: 1.2em;
             font-weight: bold;
         }
 
         .game-container {
             flex: 1;
             width: 100%;
-            display: flex;
-            flex-direction: column;
+            position: relative;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         iframe {
-            flex: 1;
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
+            min-width: 800px;
+            height: 100%;
+            min-height: 600px;
             border: none;
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .nav-bar {
+                padding: 8px 10px;
+            }
+
+            .home-link {
+                font-size: 0.9em;
+                padding: 5px 12px;
+            }
+
+            .game-title {
+                font-size: 1em;
+            }
+
+            iframe {
+                min-width: 1000px;
+                min-height: 800px;
+            }
         }
     </style>
 </head>
