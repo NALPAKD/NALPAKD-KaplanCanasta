@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canasta - 3 Decks (156 Cards) - Next Hand & Scoring</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f2e1d; color: white; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    
+    /* --- TOP BAR --- */
+    .top-bar {
+        background: rgba(0,0,0,0.8); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ffd700; flex-shrink: 0;
+    }
+    h1 { font-size: 18px; color: #ffd700; margin: 0; }
+    .controls select, .controls button { margin-left: 10px; padding: 4px 8px; border-radius: 4px; border: 1px solid #555; background: #333; color: white; cursor: pointer; font-size: 12px; }
+    .controls button:hover { background: #555; }
+    .btn-recycle { background: #d35400 !important; color: white !important; border: 1px solid #e67e22 !important; display: none; }
+    .btn-go-out { background: #e74c3c !important; color: white !important; font-weight: bold; border: 1px solid #c0392b !important; }
+    
+    .btn-next-hand { background: #27ae60 !important; border: 1px solid #2ecc71 !important; display: none; }
+    .btn-next-hand:disabled { background: #555 !important; border-color: #777 !important; cursor: not-allowed; opacity: 0.5; }
+
+    /* --- DROPDOWN HAND MENU --- */
+    .hand-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    .dropbtn {
+        background-color: #ffd700;
+        color: #000;
+        padding: 6px 12px;
+        font-size: 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    .dropbtn:hover { background-color: #ffea00; }
+    .dropdown-content {
+        display: none;
+        position: absolute;
+        background-color: rgba(255,255,255,0.95);
+        min-width: 120px;
+        max-width: 300px;
+        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+        z-index: 1000;
+        padding: 10px;
+        border-radius: 5px;
+        top: 100%;
+        right: 0;
+        margin-top: 5px;
+    }
+    .dropdown-content.show { display: block; }
+    .dropdown-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 4px 0;
+        border-bottom: 1px solid #eee;
+        color: black;
+        font-size: 13px;
+    }
+    .dropdown-card:last-child { border-bottom: none; }
+    .mini-dropdown-card { 
+        width: 24px; height: 34px; background: white; border: 1px solid #ccc; border-radius: 3px; 
+        display: flex; justify-content: center; align-items: center; font-size: 11px; font-weight: bold;
+    }
+    .card-red { color: #d00; }
+    .card-black { color: #000; }
+
+    /* --- GAME TABLE LAYOUT --- */
+    .game-container {
+        flex: 1; display: grid; 
+        grid-template-columns: 200px 1fr 200px; 
+        grid-template-rows: 180px 1fr 180px; 
+        gap: 5px; padding: 5px;
+        background: #1a472a; position: relative;
+    }
+
+    /* --- PLAYER AREAS --- */
+    .player-area {
+        background: rgba(0,0,0,0.3); border-radius: 8px; padding: 5px; display: flex; flex-direction: column; align-items: center; border: 1px solid #333; position: relative;
+        overflow: hidden; 
+    }
+    .player-area.active-turn { border: 2px solid #ffd700; box-shadow: 0 0 15px rgba(255,215,0,0.3); background: rgba(255,215,0,0.1); }
+    .player-area.floating { border: 2px solid #00ffff; animation: pulse 2s infinite; }
+    
+    /* SPECIFIC FIX FOR SOUTH PLAYER TO ALLOW SCROLLING IF HAND IS LARGE */
+    #area-south {
+        overflow-x: auto;
+        justify-content: flex-start;
+    }
+    
+    .player-info { font-size: 12px; font-weight: bold; color: #ffd700; text-align: center; margin-bottom: 5px; flex-shrink: 0; }
+    .stats-row { display: flex; gap: 10px; font-size: 10px; color: #ccc; margin-bottom: 5px; text-align: center; flex-shrink: 0; }
+    .stat-box { background: rgba(0,0,0,0.4); padding: 2px 5px; border-radius: 4px; }
+    .stat-canasta { color: #00ffff; font-weight: bold; }
+
+    /* Red 3 Box */
+    .red3-box {
+        width: 100%; min-height: 20px; background: rgba(220,20,60,0.2); border: 1px solid #dc143c; border-radius: 4px; 
+        margin-bottom: 5px; display: flex; justify-content: center; align-items: center; font-size: 11px; color: #ff6b6b; flex-shrink: 0;
+    }
+
+    /* Hand Layouts */
+    .hand-container {
+        display: flex; justify-content: center; 
+        align-items: center; height: 100%; width: 100%; perspective: 1000px; overflow: hidden; 
+    }
+    .hand-vertical { flex-direction: column; }
+    .hand-horizontal { flex-direction: row; }
+
+    /* Card Styles */
+    .card {
+        background: white; border-radius: 4px; position: relative; 
+        box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        display: flex; justify-content: center; align-items: center; font-weight: bold; user-select: none;
+        transition: transform 0.2s;
+    }
+    
+    /* ORIGINAL SIZE: 40px x 56px */
+    
+    /* ALL PLAYERS: NO OVERLAP */
+    .card-h { width: 40px; height: 56px; margin: 2px; font-size: 13px; } 
+    .card-v { width: 40px; height: 56px; margin: 2px; font-size: 13px; transform: rotate(90deg); }
+
+    .card-red { color: #d00; }
+    .card-black { color: #000; }
+    
+    .card:hover { transform: scale(1.1); z-index: 100; }
+    .card-h.selected, .card-v.selected { transform: translateY(-15px) !important; border: 2px solid #00ffff; z-index: 100; }
+    .card-v.selected { transform: rotate(90deg) translateX(-15px) !important; }
+
+    .card-back {
+        background: #2c3e50;
+        background-image: repeating-linear-gradient(45deg, #34495e 0px, #34495e 10px, #2c3e50 10px, #2c3e50 20px);
+        border: 2px solid white;
+    }
+    .card-back::after { content: '🂠'; font-size: 20px; color: #888; }
+
+    /* --- CENTER TABLE AREA --- */
+    .center-table {
+        grid-column: 2; grid-row: 2;
+        background: #27ae60; border: 5px solid #1e3a28; border-radius: 15px;
+        display: grid; grid-template-rows: auto 1fr; gap: 10px; padding: 10px; position: relative;
+    }
+    
+    .piles-row { display: flex; justify-content: center; gap: 40px; align-items: center; }
+    
+    .discard-box { 
+        width: 70px; height: 98px; background: rgba(0,0,0,0.2); border: 2px dashed #aaa; 
+        border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative;
+    }
+    .discard-box:hover { border-color: #fff; }
+    .discard-card { font-size: 20px; }
+
+    .draw-box {
+        width: 70px; height: 98px; background: rgba(0,0,0,0.2); border: 2px solid #fff;
+        border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+    .draw-card { width: 60px; height: 90px; border-radius: 5px; }
+
+    .meld-area {
+        display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: 15px;
+        overflow-y: auto; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 8px;
+    }
+    
+    .meld-pile {
+        background: rgba(255,255,255,0.95); padding: 5px; border-radius: 6px;
+        min-width: 70px; text-align: center; border: 2px solid #333; cursor: pointer; position: relative;
+        transition: transform 0.2s; display: flex; flex-direction: column; align-items: center;
+    }
+    .meld-pile:hover { transform: scale(1.05); z-index: 10; }
+    
+    /* Canasta Styling */
+    .meld-pile.canasta {
+        border: 3px solid #ffd700;
+        box-shadow: 0 0 10px rgba(255,215,0,0.5);
+        background: #fff8e1;
+    }
+    .meld-pile.canasta::after {
+        content: '★ CANASTA';
+        position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+        background: #ffd700; color: #000; font-size: 9px; padding: 2px 6px; border-radius: 10px; font-weight: bold;
+    }
+
+    .meld-label { font-size: 10px; font-weight: bold; color: #333; margin-bottom: 2px; }
+    .meld-count { font-size: 9px; color: #555; margin-bottom: 2px; } 
+    .meld-cards { display: flex; justify-content: center; font-size: 14px; }
+    .mini-card { margin: 0px; width: 8px; overflow: hidden; display: inline-block; }
+
+    /* --- NEW ACTION BOX --- */
+    .action-box-container {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.9); border: 2px solid #00ffff; border-radius: 12px;
+        padding: 15px 25px; display: none; flex-direction: column; gap: 10px; z-index: 200;
+        box-shadow: 0 0 20px rgba(0,0,0,0.8); min-width: 250px;
+    }
+    .action-box-title { color: #00ffff; font-size: 16px; font-weight: bold; text-align: center; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px; }
+    .action-buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .action-btn { padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; color: white; font-weight: bold; transition: 0.2s; }
+    .btn-meld { background: #2980b9; } .btn-meld:hover { background: #3498db; }
+    .btn-add { background: #8e44ad; } .btn-add:hover { background: #9b59b6; }
+    .btn-discard { background: #d35400; } .btn-discard:hover { background: #e67e22; }
+    .btn-go-out { background: #c0392b; border: 1px solid #e74c3c; } .btn-go-out:hover { background: #e74c3c; }
+    .btn-cancel { background: #7f8c8d; margin-top: 5px; } .btn-cancel:hover { background: #95a5a6; }
+
+    /* --- OVERLAYS --- */
+    .msg-box {
+        position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+        background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; color: #fff; font-size: 14px; pointer-events: none; white-space: nowrap; z-index: 20; border: 1px solid #555;
+    }
+
+    .float-msg {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: rgba(0, 255, 255, 0.2); border: 2px solid #00ffff; color: #00ffff;
+        padding: 10px 20px; border-radius: 10px; font-weight: bold; display: none; pointer-events: none; z-index: 50;
+    }
+
+    /* Grid Positioning */
+    .p-north { grid-column: 2; grid-row: 1; }
+    .p-south { grid-column: 2; grid-row: 3; z-index: 10; background: rgba(0,0,0,0.5); }
+    .p-west { grid-column: 1; grid-row: 2; }
+    .p-east { grid-column: 3; grid-row: 2; }
+
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(0, 255, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); } }
+
+/* MULTIPLAYER LOBBY */
+#mpLobby {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.95); display: flex; align-items: center;
+    justify-content: center; z-index: 10000;
+}
+#mpLobby.hidden { display: none; }
+.lobby-content {
+    background: rgba(255,255,255,0.1); padding: 40px; border-radius: 15px;
+    max-width: 600px; text-align: center;
+}
+.lobby-content h1 { color: #ffd700; margin-bottom: 20px; }
+.lobby-id {
+    font-size: 18px; color: #00ffff; padding: 15px;
+    background: rgba(0,0,0,0.5); border-radius: 8px;
+    word-break: break-all; user-select: all; margin: 15px 0;
+}
+.lobby-content input {
+    width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px;
+    border: 2px solid #555; background: #222; color: white; font-size: 16px;
+}
+.lobby-content button {
+    width: 100%; padding: 15px; margin: 10px 0; border-radius: 8px;
+    border: none; background: #27ae60; color: white;
+    font-size: 18px; font-weight: bold; cursor: pointer;
+}
+.lobby-content button:hover { background: #2ecc71; }
+.lobby-content button:disabled { background: #555; opacity: 0.5; }
+.btn-start-mp { background: #e74c3c !important; font-size: 22px !important; }
+#mpConnections {
+    margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.3);
+    border-radius: 8px; min-height: 100px;
+}
+.mp-connection {
+    padding: 10px; margin: 5px 0; background: rgba(46, 204, 113, 0.3);
+    border: 1px solid #2ecc71; border-radius: 5px; color: #2ecc71;
+}
+</style>
+</head>
+<body>
+<!-- MULTIPLAYER LOBBY -->
+<div id="mpLobby">
+    <div class="lobby-content">
+        <h1>🃏 CANASTA MULTIPLAYER 🃏</h1>
+        <p style="color:#00ffff; margin-bottom:20px;">Peer-to-Peer Connection</p>
+        
+        <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:8px; margin:20px 0;">
+            <h3 style="color:#ffd700; margin-bottom:10px;">Your ID:</h3>
+            <div class="lobby-id" id="mpMyId" onclick="navigator.clipboard.writeText(this.textContent)">
+                Connecting...
+            </div>
+            <p style="font-size:12px; color:#888;">Click to copy</p>
+        </div>
+        
+        <button onclick="mpBecomeHost()" id="mpHostBtn" style="background:#3498db;">
+            I'm Hosting (Tab 1)
+        </button>
+        
+        <div style="margin:20px 0; color:#888;">─── OR ───</div>
+        
+        <input type="text" id="mpHostInput" placeholder="Enter host ID">
+        <button onclick="mpJoinHost()" id="mpJoinBtn">Connect to Host</button>
+        
+        <div id="mpConnections">
+            <div style="color:#888; text-align:center;">Waiting...</div>
+        </div>
+        
+        <div id="mpStartArea"></div>
+    </div>
+</div>
+
+<div class="top-bar">
+    <h1>🃏 CANASTA (3 DECKS) 🃏</h1>
+    <div class="controls">
+        <select id="gameMode" onchange="changeMode()">
+            <option value="teams">Teams (2v2)</option>
+            <option value="solo">Individuals (1v1v1v1)</option>
+        </select>
+        <button onclick="newGame()">New Game</button>
+        <button id="btnNextHand" class="btn-next-hand" onclick="nextHand()">Next Hand</button>
+        <button id="btnRecycle" class="btn-recycle" onclick="recycleDeck()">♻️ Recycle Deck</button>
+        
+        <!-- DROPDOWN HAND BUTTON -->
+        <div class="hand-dropdown">
+            <button onclick="toggleDropdown()" class="dropbtn">📋 My Hand</button>
+            <div id="myHandDropdown" class="dropdown-content">
+                <!-- Cards will be populated by JS -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="game-container">
+    <!-- North Player -->
+    <div class="player-area p-north" id="area-north">
+        <div class="player-info" id="label-NORTH">NORTH</div>
+        <div class="red3-box" id="r3-north">Red 3s: 0</div>
+        <div class="stats-row">
+            <div class="stat-box">Score: <span id="score-north">0</span></div>
+            <div class="stat-box">Cards: <span id="count-north">0</span></div>
+        </div>
+        <div class="stats-row">
+            <div class="stat-box stat-canasta">Canastas: <span id="canastas-north">0</span>/3</div>
+        </div>
+        <div class="hand-container hand-horizontal" id="hand-north"></div>
+    </div>
+
+    <!-- West Player -->
+    <div class="player-area p-west" id="area-west">
+        <div class="player-info" id="label-WEST">WEST</div>
+        <div class="red3-box" id="r3-west">Red 3s: 0</div>
+        <div class="stats-row">
+            <div class="stat-box">Score: <span id="score-west">0</span></div>
+            <div class="stat-box">Cards: <span id="count-west">0</span></div>
+        </div>
+        <div class="stats-row">
+            <div class="stat-box stat-canasta">Canastas: <span id="canastas-west">0</span>/3</div>
+        </div>
+        <div class="hand-container hand-vertical" id="hand-west"></div>
+    </div>
+
+    <!-- Center Table -->
+    <div class="center-table">
+        <div class="float-msg" id="floatMsg">FLOATING!</div>
+        <div class="msg-box" id="message">Welcome! Start a New Game.</div>
+        
+        <div class="piles-row">
+            <div class="draw-box" onclick="humanDraw()">
+                <div class="draw-card card-back"></div>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; align-items:center;">
+                <div class="discard-box" id="discardPile" ondrop="dropDiscard(event)" ondragover="allowDrop(event)">
+                    <span id="discardContent">Empty</span>
+                </div>
+                <button id="btnPickup" onclick="attemptPickup()" style="margin-top:5px; font-size:9px; padding:2px 5px; display:none;">Pickup</button>
+            </div>
+        </div>
+
+        <div class="meld-area" id="tableMelds"></div>
+
+        <!-- NEW ACTION BOX HTML -->
+        <div id="actionBox" class="action-box-container">
+            <div class="action-box-title">SELECTED CARDS</div>
+            <div class="action-buttons">
+                <button class="action-btn btn-meld" onclick="humanNewMeld()">New Meld</button>
+                <button class="action-btn btn-add" onclick="attemptAddToSelectedMeld()">Add to Meld</button>
+                <button class="action-btn btn-discard" onclick="discardSelected()">Discard</button>
+                <button class="action-btn btn-go-out" onclick="discardAndGoOut()">Discard & Go Out</button>
+            </div>
+            <button class="action-btn btn-cancel" onclick="deselectAll()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- East Player -->
+    <div class="player-area p-east" id="area-east">
+        <div class="player-info" id="label-EAST">EAST</div>
+        <div class="red3-box" id="r3-east">Red 3s: 0</div>
+        <div class="stats-row">
+            <div class="stat-box">Score: <span id="score-east">0</span></div>
+            <div class="stat-box">Cards: <span id="count-east">0</span></div>
+        </div>
+        <div class="stats-row">
+            <div class="stat-box stat-canasta">Canastas: <span id="canastas-east">0</span>/3</div>
+        </div>
+        <div class="hand-container hand-vertical" id="hand-east"></div>
+    </div>
+
+    <!-- South Player (Human) -->
+    <div class="player-area p-south" id="area-south">
+        <div class="player-info" id="label-south">SOUTH</div>
+        <div class="red3-box" id="r3-south">Red 3s: 0</div>
+        <div class="stats-row">
+            <div class="stat-box">Score: <span id="score-south">0</span></div>
+            <div class="stat-box">Cards: <span id="count-south">0</span></div>
+        </div>
+        <div class="stats-row">
+            <div class="stat-box stat-canasta">Canastas: <span id="canastas-south">0</span>/3</div>
+        </div>
+        <div class="hand-container hand-horizontal" id="hand-south"></div>
+    </div>
+</div>
+
+<script>
+    // --- CONFIG ---
+    const SUITS = ['♠', '♣', '♥', '♦'];
+    const RANKS = ['4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2', '3', 'Joker'];
+    const CARD_VALUES = { 'Joker': 50, '2': 20, 'A': 20, 'K': 15, 'Q': 15, 'J': 15, '10': 15, '9': 15, '8': 15, '7': 5, '6': 5, '5': 5, '4': 5, '3': 5 };
+    const PLAYERS = ['south', 'west', 'north', 'east'];
+	// MULTIPLAYER VARIABLES
+let mpPeer = null;
+let mpMyId = null;
+let mpConnections = {};
+let mpIsHost = false;
+let mpPlayerPosition = 'south'; // south, west, north, east
+let mpPositionMap = {}; // Maps peer IDs to positions
+let mpMultiplayerActive = false; // Track if we're in multiplayer mode
+
+
+    // --- STATE ---
+    const game = {
+        deck: [],
+        hands: { south: [], west: [], north: [], east: [] },
+        discard: [],
+        melds: [],
+        red3s: { south: 0, west: 0, north: 0, east: 0 },
+        scores: { south: 0, west: 0, north: 0, east: 0 },
+        canastaCounts: { south: 0, west: 0, north: 0, east: 0 },
+        hasMelded: { south: false, west: false, north: false, east: false },
+        isFloating: { south: false, west: false, north: false, east: false },
+        
+        mode: 'teams', 
+        currentPlayerIndex: 0,
+        hasDrawn: false,
+        selectedCardIds: new Set(),
+        isGameOver: false,
+        isMatchOver: false // Flag to indicate match is over (someone hit 10k)
+    };
+
+    // --- UTILS ---
+    function msg(text) { 
+        const el = document.getElementById('message');
+        el.textContent = text; 
+        el.style.opacity = 1;
+    }
+
+    function areTeammates(p1, p2) {
+        if (game.mode === 'solo') return false;
+        const idx1 = PLAYERS.indexOf(p1);
+        const idx2 = PLAYERS.indexOf(p2);
+        return (idx1 % 2) === (idx2 % 2);
+    }
+
+    function getOwnerGroup(p) {
+        if (game.mode === 'solo') return p;
+        const idx = PLAYERS.indexOf(p);
+        return (idx % 2 === 0) ? 'team1' : 'team2';
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+    function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } }
+
+    function changeMode() {
+        if (mpMultiplayerActive && !mpIsHost) return;
+        game.mode = document.getElementById('gameMode').value;
+        newGame();
+    }
+
+    // --- DROPDOWN HAND LOGIC ---
+    function toggleDropdown() {
+        document.getElementById("myHandDropdown").classList.toggle("show");
+        updateDropdownHand();
+    }
+
+    // Close dropdown if user clicks outside
+    window.onclick = function(event) {
+        if (!event.target.matches('.dropbtn')) {
+            var dropdowns = document.getElementsByClassName("dropdown-content");
+            for (var i = 0; i < dropdowns.length; i++) {
+                var openDropdown = dropdowns[i];
+                if (openDropdown.classList.contains('show')) {
+                    openDropdown.classList.remove('show');
+                }
+            }
+        }
+    }
+
+    function updateDropdownHand() {
+        const ddContent = document.getElementById("myHandDropdown");
+        ddContent.innerHTML = "";
+        
+        const hand = game.hands[mpPlayerPosition];
+        if (hand.length === 0) {
+            ddContent.innerHTML = "<div style='color:#333; padding:10px; text-align:center;'>Hand is empty</div>";
+            return;
+        }
+
+        // Sort and display
+        const sortedHand = [...hand].sort((a,b) => {
+            if(a.rank !== b.rank) return RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank);
+            return SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit);
+        });
+
+        sortedHand.forEach(card => {
+            const div = document.createElement('div');
+            div.className = 'dropdown-card';
+            
+            const isSelected = game.selectedCardIds.has(card.id);
+            const colorClass = (card.suit === '♥' || card.suit === '♦') ? 'card-red' : 'card-black';
+            
+            div.innerHTML = `
+                <div style="font-weight:bold; ${isSelected ? 'color:#d35400' : ''}">${card.rank}${card.suit}</div>
+                <div class="mini-dropdown-card ${colorClass}">${card.rank}</div>
+            `;
+            
+            // Optional: Click to select/deselect from dropdown
+            div.onclick = (e) => {
+                e.stopPropagation();
+                if(!isMyTurn() || !game.hasDrawn) return;
+                if(game.selectedCardIds.has(card.id)) game.selectedCardIds.delete(card.id);
+                else game.selectedCardIds.add(card.id);
+                updateDropdownHand(); // Re-render to show selection
+                updateUI(); // Update main UI
+            };
+
+            ddContent.appendChild(div);
+        });
+    }
+
+    // --- SETUP ---
+    function newGame() {
+        if (mpMultiplayerActive && !mpIsHost) return;
+        // Reset everything including scores
+        game.scores = { south: 0, west: 0, north: 0, east: 0 };
+        game.isMatchOver = false;
+        
+        resetHandState();
+        msg('New Game Started! First to 10,000 wins.');
+        if (mpMultiplayerActive && mpIsHost) mpSyncGame();
+    }
+
+    function nextHand() {
+        if (mpMultiplayerActive && !mpIsHost) return;
+        if (game.isMatchOver) return;
+        resetHandState();
+        msg('Next Hand Started!');
+        if (mpMultiplayerActive && mpIsHost) mpSyncGame();
+    }
+
+    function resetHandState() {
+        game.isGameOver = false;
+        game.deck = [];
+        game.melds = [];
+        game.discard = [];
+        game.red3s = { south: 0, west: 0, north: 0, east: 0 };
+        game.canastaCounts = { south: 0, west: 0, north: 0, east: 0 }; 
+        game.hasMelded = { south: false, west: false, north: false, east: false };
+        game.isFloating = { south: false, west: false, north: false, east: false }; 
+        game.currentPlayerIndex = 0;
+        game.hasDrawn = false;
+        game.selectedCardIds.clear();
+
+        PLAYERS.forEach(p => game.hands[p] = []);
+        
+        // 3 DECKS (156 cards)
+        let id = 0;
+        for (let d = 0; d < 3; d++) {
+            SUITS.forEach(s => RANKS.forEach(r => {
+                if (r !== 'Joker') game.deck.push({ id: id++, rank: r, suit: s });
+            }));
+            game.deck.push({ id: id++, rank: 'Joker', suit: '🃏' });
+            game.deck.push({ id: id++, rank: 'Joker', suit: '🃏' });
+        }
+        shuffle(game.deck);
+
+        // Deal 7 cards each
+        PLAYERS.forEach(p => { for(let i=0; i<7; i++) { if(game.deck.length) game.hands[p].push(game.deck.pop()); }});
+
+        // Initial Discard
+        if(game.deck.length) {
+            let c = game.deck.pop();
+            while(c.rank === 'Joker' || c.rank === '3' || c.rank === '2') {
+                game.deck.unshift(c); c = game.deck.pop();
+            }
+            game.discard.push(c);
+        }
+
+        updateUI();
+    }
+
+    function recycleDeck() {
+        if (game.deck.length > 0) return;
+        if (game.discard.length <= 1) { msg("Cannot recycle."); return; }
+        const topCard = game.discard.pop();
+        const toShuffle = [...game.discard];
+        game.discard = [topCard];
+        shuffle(toShuffle);
+        game.deck = toShuffle;
+        msg("Deck Recycled!");
+        updateUI();
+        if (mpMultiplayerActive) mpSyncGame();
+    }
+
+    function humanDraw() {
+        if (!isMyTurn()) return;
+        if (game.hasDrawn) { msg("Already drawn!"); return; }
+        if (game.deck.length === 0) { msg("Deck empty! Click Recycle."); return; }
+
+        performDraw(PLAYERS.indexOf(mpPlayerPosition));
+        updateUI();
+        msg('Drew 2 cards.');
+		mpSyncGame();
+    }
+
+    function performDraw(pIdx) {
+        for(let i=0; i<2; i++) {
+            if(game.deck.length) game.hands[PLAYERS[pIdx]].push(game.deck.pop());
+        }
+        game.hasDrawn = true;
+        
+        if (game.hands[PLAYERS[pIdx]].length === 0) {
+            game.isFloating[PLAYERS[pIdx]] = true;
+        }
+        
+        checkRedThrees(pIdx);
+    }
+
+    function checkRedThrees(pIdx) {
+        const hand = game.hands[PLAYERS[pIdx]];
+        const p = PLAYERS[pIdx];
+        for(let i=hand.length-1; i>=0; i--) {
+            const c = hand[i];
+            if(c.rank === '3' && (c.suit === '♥' || c.suit === '♦')) {
+                hand.splice(i, 1);
+                game.red3s[p]++;
+                if(game.deck.length) hand.push(game.deck.pop());
+            }
+        }
+    }
+
+    function attemptPickup() {
+        if (!isMyTurn()) return;
+        if (game.hasDrawn) { msg("Already acted!"); return; }
+        if (game.discard.length === 0) return;
+
+        const topCard = game.discard[game.discard.length-1];
+        const hand = game.hands[mpPlayerPosition];
+
+        if (topCard.rank === '3' && (topCard.suit === '♠' || topCard.suit === '♣')) { msg("Blocked by Black 3."); return; }
+        if (topCard.rank === 'Joker' || topCard.rank === '2') { msg("Cannot pickup wilds."); return; }
+
+        const naturalsInHand = hand.filter(c => c.rank === topCard.rank).length;
+        if (naturalsInHand < 2) { msg(`Need two ${topCard.rank}s.`); return; }
+
+        while(game.discard.length) hand.push(game.discard.pop());
+        game.hasDrawn = true;
+        updateUI();
+        msg('Picked up pile!');
+		mpSyncGame();
+    }
+
+    // --- MELD ACTIONS ---
+    function onMeldClick(meldId) {
+        if (!isMyTurn() || !game.hasDrawn) return;
+        const meld = game.melds.find(m => m.id === meldId);
+        if (!meld) return;
+        
+        if (!areTeammates(mpPlayerPosition, meld.owner)) { msg("Not your meld."); return; }
+        
+        // Select the meld target internally for "Add to Meld" button
+        game.targetMeldId = meldId;
+        
+        const selectedCards = game.hands[mpPlayerPosition].filter(c => game.selectedCardIds.has(c.id));
+        if (selectedCards.length === 0) { 
+            msg("Select cards from hand to add."); 
+            return; 
+        }
+        
+        if (meld.rank === '3' && selectedCards.some(c => c.rank === '2' || c.rank === 'Joker')) {
+             msg("No wilds in Black 3s."); return;
+        }
+
+        if (validateAddToMeld(selectedCards, meld)) {
+            executeAddToMeld(PLAYERS.indexOf(mpPlayerPosition), meld, selectedCards);
+            game.selectedCardIds.clear();
+            updateUI();
+            msg("Added to meld!");
+            if (mpMultiplayerActive) mpSyncGame();
+        } else {
+            msg("Invalid addition.");
+        }
+    }
+
+    function attemptAddToSelectedMeld() {
+        if (!isMyTurn() || !game.hasDrawn) return;
+        const selectedCards = game.hands[mpPlayerPosition].filter(c => game.selectedCardIds.has(c.id));
+        if (selectedCards.length === 0) { msg("Select cards first."); return; }
+
+        // If user clicked a meld previously, use it, otherwise check if only 1 valid meld exists
+        let targetMeld = game.melds.find(m => m.id === game.targetMeldId);
+        
+        // If no target meld explicitly set yet, try to auto-detect based on cards
+        if (!targetMeld) {
+            const myMelds = game.melds.filter(m => areTeammates(mpPlayerPosition, m.owner));
+            const candidates = myMelds.filter(m => validateAddToMeld(selectedCards, m));
+            
+            if (candidates.length === 0) { msg("No valid meld to add to. Click a meld first."); return; }
+            if (candidates.length > 1) { msg("Multiple valid melds. Click the specific meld first."); return; }
+            targetMeld = candidates[0];
+        }
+
+        if (validateAddToMeld(selectedCards, targetMeld)) {
+            executeAddToMeld(PLAYERS.indexOf(mpPlayerPosition), targetMeld, selectedCards);
+            game.selectedCardIds.clear();
+            game.targetMeldId = null; // Reset target
+            updateUI();
+            msg("Added to meld!");
+        } else {
+            msg("Invalid addition.");
+        }
+		mpSyncGame();
+    }
+
+    function humanNewMeld() {
+        if (!isMyTurn()) return;
+        const selected = game.hands[mpPlayerPosition].filter(c => game.selectedCardIds.has(c.id));
+        const valid = validateNewMeld(selected, PLAYERS.indexOf(mpPlayerPosition));
+        if (valid.valid) {
+            createNewMeld(PLAYERS.indexOf(mpPlayerPosition), selected, valid.rank);
+            game.selectedCardIds.clear();
+            updateUI();
+            msg(`Melded ${valid.rank}s!`);
+        } else {
+            msg(valid.reason);
+        }
+		mpSyncGame();
+    }
+
+    function validateAddToMeld(cards, targetMeld) {
+        const targetRank = targetMeld.rank;
+        for (let c of cards) {
+            const isWild = (c.rank === '2' || c.rank === 'Joker');
+            const isMatch = (c.rank === targetRank);
+            if (!isWild && !isMatch) return false;
+        }
+        const allCards = [...targetMeld.cards, ...cards];
+        const naturals = allCards.filter(c => c.rank !== '2' && c.rank !== 'Joker').length;
+        const wilds = allCards.filter(c => c.rank === '2' || c.rank === 'Joker').length;
+        if (targetRank === '3') return wilds === 0;
+        return (naturals > wilds);
+    }
+
+    function validateNewMeld(cards, pIdx) {
+        if (cards.length < 3) return { valid: false, reason: "Need 3+ cards." };
+        const wilds = cards.filter(c => c.rank === '2' || c.rank === 'Joker');
+        const naturals = cards.filter(c => c.rank !== '2' && c.rank !== 'Joker');
+        const naturalRanks = [...new Set(naturals.map(c => c.rank))];
+        if (naturalRanks.length > 1) return { valid: false, reason: "Mixed ranks." };
+        if (naturals.length === 0) return { valid: false, reason: "Need naturals." };
+        const rank = naturalRanks[0];
+
+        if (rank === '3') {
+            if (wilds.length > 0) return { valid: false, reason: "No wilds in 3s." };
+            return { valid: true, rank: '3' };
+        }
+        if (naturals.length <= wilds.length) return { valid: false, reason: "Too many wilds." };
+
+        const p = PLAYERS[pIdx];
+        if (!game.hasMelded[p]) {
+            const points = cards.reduce((s,c) => s + (CARD_VALUES[c.rank]||0), 0);
+            const min = getMinimumMeldScore(pIdx);
+            if (points < min) return { valid: false, reason: `Initial needs ${min} pts.` };
+        }
+        return { valid: true, rank: rank };
+    }
+
+    function createNewMeld(pIdx, cards, rank) {
+        const player = PLAYERS[pIdx];
+        const hand = game.hands[player];
+        cards.forEach(c => { const idx = hand.findIndex(h => c.id === h.id); if(idx>-1) hand.splice(idx, 1); });
+        
+        game.melds.push({
+            id: Date.now() + Math.random(),
+            rank: rank,
+            owner: player,
+            cards: cards
+        });
+        
+        game.hasMelded[player] = true;
+        
+        checkCanasta(player, cards.length);
+
+        const points = cards.reduce((s,c) => s + (CARD_VALUES[c.rank]||0), 0);
+        game.scores[player] += points;
+    }
+
+    function executeAddToMeld(pIdx, meld, cards) {
+        const player = PLAYERS[pIdx];
+        const hand = game.hands[player];
+        cards.forEach(c => { const idx = hand.findIndex(h => c.id === h.id); if(idx>-1) hand.splice(idx, 1); });
+        meld.cards.push(...cards);
+        
+        checkCanasta(player, meld.cards.length);
+
+        const points = cards.reduce((s,c) => s + (CARD_VALUES[c.rank]||0), 0);
+        game.scores[player] += points;
+    }
+
+    function checkCanasta(player, currentMeldSize) {
+        let count = 0;
+        const team = getOwnerGroup(player);
+        const playerMelds = game.melds.filter(m => getOwnerGroup(m.owner) === team);
+        
+        playerMelds.forEach(m => {
+            if (m.cards.length >= 7) count++;
+        });
+        
+        game.canastaCounts[player] = count;
+    }
+
+    function getMinimumMeldScore(pIdx) {
+        const p = PLAYERS[pIdx];
+        const s = game.scores[p];
+        if (s < 0) return 150;
+        if (s < 1500) return 50;
+        if (s < 3000) return 90;
+        return 120;
+    }
+
+    // --- DISCARD & END TURN ---
+    function discardSelected() {
+        if (!isMyTurn() || !game.hasDrawn) { msg("Draw first!"); return; }
+        const selected = game.hands[mpPlayerPosition].filter(c => game.selectedCardIds.has(c.id));
+        if (selected.length !== 1) { msg("Select exactly 1 card to discard."); return; }
+        
+        const c = selected[0];
+        if (c.rank === '3' && (c.suit === '♥' || c.suit === '♦')) { msg("No discard red 3s."); return; }
+        
+        game.discard.push(c);
+        const idx = game.hands[mpPlayerPosition].findIndex(x => x.id === c.id);
+        game.hands[mpPlayerPosition].splice(idx, 1);
+        game.selectedCardIds.clear();
+        endTurn();
+		mpSyncGame();
+    }
+
+    function discardAndGoOut() {
+        if (!isMyTurn()) return;
+        const selected = game.hands[mpPlayerPosition].filter(c => game.selectedCardIds.has(c.id));
+        if (selected.length !== 1) { msg("Select 1 card to discard."); return; }
+        
+        const c = selected[0];
+        if (c.rank === '3' && (c.suit === '♥' || c.suit === '♦')) { msg("No discard red 3s."); return; }
+
+        // Check Go Out conditions
+        let totalCanastas = 0;
+        if (game.mode === 'teams') {
+            const team = getOwnerGroup(mpPlayerPosition);
+            PLAYERS.forEach(p => {
+                if (getOwnerGroup(p) === team) totalCanastas += game.canastaCounts[p];
+            });
+        } else {
+            totalCanastas = game.canastaCounts[mpPlayerPosition];
+        }
+
+        if (totalCanastas < 3) {
+            msg(`Need 3 Canastas to go out. You have ${totalCanastas}.`); 
+            return;
+        }
+
+        // If we have more than this 1 card + the discard, we can't go out
+        if (game.hands[mpPlayerPosition].length > 1) { 
+            msg("Must meld all cards except discard to go out."); 
+            return; 
+        }
+
+        // Perform discard
+        game.discard.push(c);
+        const idx = game.hands[mpPlayerPosition].findIndex(x => x.id === c.id);
+        game.hands[mpPlayerPosition].splice(idx, 1);
+        game.selectedCardIds.clear();
+        
+        game.isGameOver = true;
+        calculateScore();
+		mpSyncGame();
+    }
+
+    function discardCard(cardId) {
+        // Legacy function for drag/drop, maps to new logic
+        game.selectedCardIds.clear();
+        game.selectedCardIds.add(cardId);
+        updateUI(); // Triggers selection visual
+        discardSelected();
+    }
+
+    // --- SCORING ---
+    function calculateScore() {
+        msg("Hand Over! Calculating Scores...");
+        
+        // Identify winner(s)
+        const winner = PLAYERS[game.currentPlayerIndex]; // The one who just went out
+        
+        let scoreReport = "";
+        let matchWinner = null;
+        
+        // Process penalties
+        PLAYERS.forEach(p => {
+            if (p === winner) return; // Winner doesn't get penalized
+            
+            const hand = game.hands[p];
+            let penalty = 0;
+            
+            hand.forEach(c => {
+                // Red 3s in hand at end = 500 penalty
+                if (c.rank === '3' && (c.suit === '♥' || c.suit === '♦')) {
+                    penalty += 500; 
+                } else {
+                    penalty += (CARD_VALUES[c.rank] || 0);
+                }
+            });
+            
+            // Deduct from loser's score
+            game.scores[p] -= penalty;
+            scoreReport += `${p.toUpperCase()}: -${penalty}. `;
+            
+            // Check for Match Winner (10k)
+            if (game.scores[p] >= 10000) matchWinner = p;
+        });
+
+        // Also check winner for 10k just in case
+        if (game.scores[winner] >= 10000) matchWinner = winner;
+
+        if (matchWinner) {
+            game.isMatchOver = true;
+            msg(`🏆 MATCH OVER! ${matchWinner.toUpperCase()} REACHES 10,000! 🏆`);
+            updateUI(); // Show final scores
+        } else {
+            msg(`🏆 ${winner.toUpperCase()} WINS HAND! 🏆 ${scoreReport}`);
+            updateUI();
+        }
+    }
+
+    function endTurn() {
+        const currPlayer = PLAYERS[game.currentPlayerIndex];
+        if (game.hands[currPlayer].length === 0 && game.hasDrawn) {
+            game.isFloating[currPlayer] = true;
+            msg(`${currPlayer.toUpperCase()} is Floating!`);
+        } else {
+            game.isFloating[currPlayer] = false;
+        }
+
+        game.hasDrawn = false;
+        game.selectedCardIds.clear();
+        game.targetMeldId = null; // Clear meld selection
+        game.currentPlayerIndex = (game.currentPlayerIndex + 1) % 4;
+        
+        // Clear status box when turn changes as requested
+        document.getElementById('message').textContent = '';
+        
+        if (game.isGameOver) return; 
+
+        updateUI();
+        
+        if (!isMyTurn()) {
+            msg(`Waiting for ${PLAYERS[game.currentPlayerIndex].toUpperCase()}...`);
+        } else {
+            msg("Your Turn.");
+        }
+    }
+
+    // --- UI ---
+    function updateUI() {
+        const humanTurn = isMyTurn();
+        
+        PLAYERS.forEach(p => {
+            document.getElementById(`score-${p}`).textContent = game.scores[p];
+            document.getElementById(`count-${p}`).textContent = game.hands[p].length;
+            document.getElementById(`canastas-${p}`).textContent = game.canastaCounts[p];
+            document.getElementById(`r3-${p}`).textContent = `Red 3s: ${game.red3s[p]}`;
+            
+            const area = document.getElementById(`area-${p}`);
+            area.className = `player-area p-${p}`;
+            if(PLAYERS.indexOf(p) === game.currentPlayerIndex) area.classList.add('active-turn');
+            if(game.isFloating[p]) area.classList.add('floating');
+        });
+
+        const floatMsg = document.getElementById('floatMsg');
+        if (game.isFloating[mpPlayerPosition]) {
+            floatMsg.style.display = 'block';
+            floatMsg.textContent = "YOU ARE FLOATING! Discard any card to end.";
+        } else {
+            floatMsg.style.display = 'none';
+        }
+
+        // Discard
+        const dEl = document.getElementById('discardContent');
+        const dBox = document.getElementById('discardPile');
+        if(game.discard.length > 0) {
+            const t = game.discard[game.discard.length-1];
+            const col = (t.suit==='♥'||t.suit==='♦')?'card-red':'card-black';
+            dEl.innerHTML = `<span class="${col}" style="font-size:20px;">${t.rank}${t.suit}</span>`;
+        } else { dEl.textContent = 'Empty'; }
+        
+        document.getElementById('btnRecycle').style.display = (game.deck.length === 0 && game.discard.length > 1) ? 'inline-block' : 'none';
+        document.getElementById('btnPickup').style.display = (humanTurn && !game.hasDrawn && game.discard.length>0) ? 'block' : 'none';
+
+        // Melds
+        const mContainer = document.getElementById('tableMelds');
+        mContainer.innerHTML = '';
+        game.melds.forEach(m => {
+            const div = document.createElement('div');
+            div.className = 'meld-pile';
+            
+            if (m.cards.length >= 7) {
+                div.classList.add('canasta');
+            }
+
+            div.style.borderColor = areTeammates(mpPlayerPosition, m.owner) ? '#ffd700' : '#34495e';
+            
+            const lastCards = m.cards.slice(-3).map(c => 
+                `<span class="mini-card ${(c.suit==='♥'||c.suit==='♦')?'card-red':'card-black'}">${c.rank}</span>`
+            ).join('');
+            
+            const countBadge = m.cards.length >= 7 ? "7/7" : `${m.cards.length}/7`;
+            
+            div.innerHTML = `<div class="meld-label">${m.owner.toUpperCase()} ${m.rank}s</div><div class="meld-count">${countBadge}</div><div class="meld-cards">${lastCards}</div>`;
+            
+            if (humanTurn && game.hasDrawn && areTeammates(mpPlayerPosition, m.owner)) {
+                div.onclick = () => onMeldClick(m.id);
+                div.style.cursor = "pointer";
+            } else {
+                div.style.cursor = "default";
+            }
+            mContainer.appendChild(div);
+        });
+
+        PLAYERS.forEach(p => renderHand(p));
+
+        // --- ACTION BOX LOGIC ---
+        const actionBox = document.getElementById('actionBox');
+        const btnGoOut = actionBox.querySelector('.btn-go-out');
+        
+        if (humanTurn && !game.isGameOver) {
+            // Show action box if cards selected
+            if (game.selectedCardIds.size > 0) {
+                actionBox.style.display = 'flex';
+                
+                // Check Go Out Visibility
+                let totalCanastas = 0;
+                if (game.mode === 'teams') {
+                    const team = getOwnerGroup(mpPlayerPosition);
+                    PLAYERS.forEach(p => {
+                        if (getOwnerGroup(p) === team) totalCanastas += game.canastaCounts[p];
+                    });
+                } else {
+                    totalCanastas = game.canastaCounts[mpPlayerPosition];
+                }
+
+                // Can only go out if 1 card selected (to discard) and that's the last card
+                const aboutToEmpty = (game.hands[mpPlayerPosition].length === 1 && game.selectedCardIds.size === 1);
+                const canGoOut = (totalCanastas >= 3 && aboutToEmpty);
+                
+                if (canGoOut) {
+                    btnGoOut.style.display = 'inline-block';
+                } else {
+                    btnGoOut.style.display = 'none';
+                }
+
+            } else {
+                actionBox.style.display = 'none';
+            }
+        } else {
+            actionBox.style.display = 'none';
+        }
+
+        // Disable game controls if not host in multiplayer
+        if (mpMultiplayerActive) {
+            document.getElementById('gameMode').disabled = !mpIsHost;
+            // The New Game button is global, but only host should use it
+            // We can hide it for others
+            const newGameBtn = document.querySelector('button[onclick="newGame()"]');
+            if (newGameBtn) newGameBtn.style.display = mpIsHost ? 'inline-block' : 'none';
+        }
+
+        // --- NEXT HAND BUTTON LOGIC ---
+        const btnNextHand = document.getElementById('btnNextHand');
+        const canShowNextHand = game.isGameOver && !game.isMatchOver;
+        
+        if (mpMultiplayerActive) {
+            btnNextHand.style.display = (mpIsHost && canShowNextHand) ? 'inline-block' : 'none';
+        } else {
+            btnNextHand.style.display = canShowNextHand ? 'inline-block' : 'none';
+        }
+        
+        if (canShowNextHand) btnNextHand.disabled = false;
+        else if (game.isMatchOver) btnNextHand.disabled = true;
+
+        // Update dropdown hand if open
+        const dd = document.getElementById("myHandDropdown");
+        if (dd.classList.contains('show')) {
+            updateDropdownHand();
+        }
+    }
+
+    function renderHand(player) {
+        const hEl = document.getElementById(`hand-${player}`);
+        hEl.innerHTML = '';
+        const hand = game.hands[player];
+        const isHuman = (player === mpPlayerPosition);
+        
+        let sortedHand = isHuman ? [...hand].sort((a,b) => {
+            if(a.rank !== b.rank) return RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank);
+            return SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit);
+        }) : hand;
+
+        sortedHand.forEach(card => {
+            const cEl = document.createElement('div');
+            const orient = (player === 'south' || player === 'north') ? 'card-h' : 'card-v';
+            cEl.className = `card ${orient}`;
+
+            if (!isHuman) {
+                cEl.classList.add('card-back');
+            } else {
+                const col = (card.suit==='♥'||card.suit==='♦')?'card-red':'card-black';
+                cEl.classList.add(col);
+                cEl.innerHTML = `<div style="font-size:12px;">${card.rank}</div><div style="font-size:20px;">${card.suit}</div>`;
+                
+                if(game.selectedCardIds.has(card.id)) cEl.classList.add('selected');
+                
+                cEl.draggable = true;
+                cEl.ondragstart = e => { 
+                    if(!isMyTurn() || !game.hasDrawn) e.preventDefault();
+                    else { e.dataTransfer.setData('text/plain', card.id); }
+                };
+                cEl.onclick = () => {
+                    if(!isMyTurn() || !game.hasDrawn) return;
+                    if(game.selectedCardIds.has(card.id)) game.selectedCardIds.delete(card.id);
+                    else game.selectedCardIds.add(card.id);
+                    updateUI();
+                };
+            }
+            hEl.appendChild(cEl);
+        });
+
+        if(isHuman) {
+            const dBox = document.getElementById('discardPile');
+            dBox.ondragover = e => { e.preventDefault(); };
+            dBox.ondrop = e => {
+                e.preventDefault();
+                if(isMyTurn() && game.hasDrawn) discardCard(Number(e.dataTransfer.getData('text/plain')));
+            };
+        }
+    }
+
+    function deselectAll() {
+        game.selectedCardIds.clear();
+        updateUI();
+    }
+	
+
+// =================================================================
+// MULTIPLAYER FUNCTIONS
+// =================================================================
+
+function mpInit() {
+    console.log('Initializing multiplayer...');
+    mpPeer = new Peer();
+    
+    mpPeer.on('open', (id) => {
+        mpMyId = id;
+        document.getElementById('mpMyId').textContent = id;
+        console.log('My ID:', id);
+    });
+    
+    mpPeer.on('connection', (conn) => {
+        console.log('Incoming connection:', conn.peer);
+        mpSetupConnection(conn);
+    });
+}
+
+function mpSetupConnection(conn) {
+    mpConnections[conn.peer] = conn;
+    
+    conn.on('open', () => {
+        console.log('Connected to:', conn.peer);
+        mpUpdateList();
+        conn.send({ type: 'hello', from: mpMyId });
+    });
+    
+    conn.on('data', (data) => {
+        console.log('Received:', data);
+        mpHandleMessage(data);
+    });
+    
+    conn.on('close', () => {
+        console.log('Disconnected:', conn.peer);
+        delete mpConnections[conn.peer];
+        mpUpdateList();
+    });
+}
+
+function mpBecomeHost() {
+    mpIsHost = true;
+    mpPlayerPosition = 'south';
+    mpPositionMap[mpMyId] = 'south';
+    
+    document.getElementById('mpHostBtn').disabled = true;
+    document.getElementById('mpHostBtn').textContent = '✅ You are HOST';
+    document.getElementById('mpHostBtn').style.background = '#2ecc71';
+    mpUpdateList();
+}
+
+function mpJoinHost() {
+    const hostId = document.getElementById('mpHostInput').value.trim();
+    if (!hostId) { alert('Enter host ID!'); return; }
+    if (hostId === mpMyId) { alert('Cannot connect to self!'); return; }
+    
+    const conn = mpPeer.connect(hostId, { reliable: true });
+    mpSetupConnection(conn);
+    
+    document.getElementById('mpJoinBtn').disabled = true;
+    document.getElementById('mpJoinBtn').textContent = '✅ Connected';
+}
+
+function mpUpdateList() {
+    const list = document.getElementById('mpConnections');
+    const startArea = document.getElementById('mpStartArea');
+    const total = Object.keys(mpConnections).length + 1;
+    
+    let html = '<strong style="color:#ffd700;">Connected:</strong><br><br>';
+    html += `<div class="mp-connection">${mpIsHost ? '👑 You (Host)' : 'You'}</div>`;
+    
+    Object.keys(mpConnections).forEach(id => {
+        html += `<div class="mp-connection">Player ${id.substring(0,8)}</div>`;
+    });
+    
+    html += `<br><div style="text-align:center; font-size:20px; color:#00ffff;">${total}/4 Players</div>`;
+    list.innerHTML = html;
+    
+    if (mpIsHost && total >= 4) {
+        startArea.innerHTML = '<button onclick="mpStartGame()" class="btn-start-mp">🎮 START GAME</button>';
+    } else if (mpIsHost) {
+        startArea.innerHTML = `<div style="color:#888; padding:15px;">Waiting for ${4-total} more...</div>`;
+    } else {
+        startArea.innerHTML = '<div style="color:#888; padding:15px;">Host will start game...</div>';
+    }
+}
+
+function mpStartGame() {
+    if (!mpIsHost) return;
+    if (Object.keys(mpConnections).length < 3) {
+        alert('Need 4 players!');
+        return;
+    }
+    
+    // Enable multiplayer mode
+    mpMultiplayerActive = true;
+    
+    // Assign positions
+    const positions = ['west', 'north', 'east'];
+    let idx = 0;
+    for (let peerId in mpConnections) {
+        mpPositionMap[peerId] = positions[idx++];
+        mpBroadcast({ type: 'position', peerId: peerId, position: positions[idx-1] });
+    }
+    
+    mpBroadcast({ type: 'start' });
+    mpShowGame();
+	// Update labels based on position
+PLAYERS.forEach(p => {
+    const label = document.getElementById(`label-${p}`);
+    if (label) {
+        label.textContent = p.toUpperCase() + (p === mpPlayerPosition ? ' (YOU)' : '');
+    }
+});	
+}
+
+function mpShowGame() {
+    console.log('Hiding lobby...');
+    const lobby = document.getElementById('mpLobby');
+    if (lobby) {
+        lobby.style.display = 'none';
+        lobby.style.visibility = 'hidden';
+        lobby.style.opacity = '0';
+        lobby.style.pointerEvents = 'none';
+    }
+    newGame();
+}
+function mpBroadcast(data, excludePeerId = null) {
+    Object.entries(mpConnections).forEach(([peerId, conn]) => {
+        if (conn.open && peerId !== excludePeerId) {
+            conn.send(data);
+        }
+    });
+}
+
+function mpHandleMessage(data) {
+    if (data.type === 'hello') {
+        console.log('Player joined');
+    }
+    else if (data.type === 'position') {
+        if (data.peerId === mpMyId) {
+            mpPlayerPosition = data.position;
+        }
+    }
+    else if (data.type === 'start') {
+        mpMultiplayerActive = true; 
+        mpShowGame();
+        // Update labels based on position for non-hosts
+        PLAYERS.forEach(p => {
+            const label = document.getElementById(`label-${p}`);
+            if (label) {
+                label.textContent = p.toUpperCase() + (p === mpPlayerPosition ? ' (YOU)' : '');
+            }
+        });
+    }
+    else if (data.type === 'gameState') {
+        // Relay to other players if we are the host
+        if (mpIsHost) {
+            mpBroadcast(data, data.from);
+        }
+        
+        // Deep update game state
+        const newState = data.state;
+        for (let key in newState) {
+            if (key === 'selectedCardIds') {
+                // Keep local selection
+            } else {
+                game[key] = newState[key];
+            }
+        }
+        updateUI();
+    }
+}
+
+function mpSyncGame() {
+    // Convert Set to Array for serialization
+    const stateToSync = { ...game };
+    stateToSync.selectedCardIds = Array.from(game.selectedCardIds);
+    
+    mpBroadcast({
+        type: 'gameState',
+        from: mpMyId,
+        state: stateToSync
+    });
+}
+
+function mpGetCurrentPosition() {
+    return PLAYERS[game.currentPlayerIndex];
+}
+
+function mpIsMyTurn() {
+    // Check if current turn position matches my position
+    const currentPos = mpGetCurrentPosition();
+    return currentPos === mpPlayerPosition;
+}
+
+function isMyTurn() { 
+    return mpIsMyTurn();
+}
+
+// Initialize multiplayer on load
+mpInit();
+
+    msg('New Game ready!');
+</script>
+</body>
+</html>

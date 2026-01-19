@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canasta - 3 Decks (156 Cards) - Next Hand & Scoring</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f2e1d; color: white; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    
+    /* --- TOP BAR --- */
+    .top-bar {
+        background: rgba(0,0,0,0.8); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ffd700; flex-shrink: 0;
+    }
+    h1 { font-size: 18px; color: #ffd700; margin: 0; }
+    .controls select, .controls button { margin-left: 10px; padding: 4px 8px; border-radius: 4px; border: 1px solid #555; background: #333; color: white; cursor: pointer; font-size: 12px; }
+    .controls button:hover { background: #555; }
+    .btn-recycle { background: #d35400 !important; color: white !important; border: 1px solid #e67e22 !important; display: none; }
+    .btn-go-out { background: #e74c3c !important; color: white !important; font-weight: bold; border: 1px solid #c0392b !important; }
+    
+    .btn-next-hand { background: #27ae60 !important; border: 1px solid #2ecc71 !important; display: none; }
+    .btn-next-hand:disabled { background: #555 !important; border-color: #777 !important; cursor: not-allowed; opacity: 0.5; }
+
+    /* --- DROPDOWN HAND MENU --- */
+    .hand-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    .dropbtn {
+        background-color: #ffd700;
+        color: #000;
+        padding: 6px 12px;
+        font-size: 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    .dropbtn:hover { background-color: #ffea00; }
+    .dropdown-content {
+        display: none;
+        position: absolute;
+        background-color: rgba(255,255,255,0.95);
+        min-width: 120px;
+        max-width: 300px;
+        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+        z-index: 1000;
+        padding: 10px;
+        border-radius: 5px;
+        top: 100%;
+        right: 0;
+        margin-top: 5px;
+    }
+    .dropdown-content.show { display: block; }
+    .dropdown-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 4px 0;
+        border-bottom: 1px solid #eee;
+        color: black;
+        font-size: 13px;
+    }
+    .dropdown-card:last-child { border-bottom: none; }
+    .mini-dropdown-card { 
+        width: 24px; height: 34px; background: white; border: 1px solid #ccc; border-radius: 3px; 
+        display: flex; justify-content: center; align-items: center; font-size: 11px; font-weight: bold;
+    }
+    .card-red { color: #d00; }
+    .card-black { color: #000; }
+
+    /* --- GAME TABLE LAYOUT --- */
+    .game-container {
+        flex: 1; display: grid; 
+        grid-template-columns: 200px 1fr 200px; 
+        grid-template-rows: 180px 1fr 180px; 
+        gap: 5px; padding: 5px;
+        background: #1a472a; position: relative;
+    }
+
+    /* --- PLAYER AREAS --- */
+    .player-area {
+        background: rgba(0,0,0,0.3); border-radius: 8px; padding: 5px; display: flex; flex-direction: column; align-items: center; border: 1px solid #333; position: relative;
+        overflow: hidden; 
+    }
+    .player-area.active-turn { border: 2px solid #ffd700; box-shadow: 0 0 15px rgba(255,215,0,0.3); background: rgba(255,215,0,0.1); }
+    .player-area.floating { border: 2px solid #00ffff; animation: pulse 2s infinite; }
+    
+    /* SPECIFIC FIX FOR SOUTH PLAYER TO ALLOW SCROLLING IF HAND IS LARGE */
+    #area-south {
+        overflow-x: auto;
+        justify-content: flex-start;
+    }
+    
+    .player-info { font-size: 12px; font-weight: bold; color: #ffd700; text-align: center; margin-bottom: 5px; flex-shrink: 0; }
+    .stats-row { display: flex; gap: 10px; font-size: 10px; color: #ccc; margin-bottom: 5px; text-align: center; flex-shrink: 0; }
+    .stat-box { background: rgba(0,0,0,0.4); padding: 2px 5px; border-radius: 4px; }
+    .stat-canasta { color: #00ffff; font-weight: bold; }
+
+    /* Red 3 Box */
+    .red3-box {
+        width: 100%; min-height: 20px; background: rgba(220,20,60,0.2); border: 1px solid #dc143c; border-radius: 4px; 
+        margin-bottom: 5px; display: flex; justify-content: center; align-items: center; font-size: 11px; color: #ff6b6b; flex-shrink: 0;
+    }
+
+    /* Hand Layouts */
+    .hand-container {
+        display: flex; justify-content: center; 
+        align-items: center; height: 100%; width: 100%; perspective: 1000px; overflow: hidden; 
+    }
+    .hand-vertical { flex-direction: column; }
+    .hand-horizontal { flex-direction: row; }
+
+    /* Card Styles */
+    .card {
+        background: white; border-radius: 4px; position: relative; 
+        box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        display: flex; justify-content: center; align-items: center; font-weight: bold; user-select: none;
+        transition: transform 0.2s;
+    }
+    
+    /* ORIGINAL SIZE: 40px x 56px */
+    
+    /* SOUTH (HUMAN): NO OVERLAP */
+    .p-south .card-h { width: 40px; height: 56px; margin: 0 2px; font-size: 13px; } 
+    
+    /* OTHER PLAYERS (AI): OVERLAPPED (negative margins) */
+    .card-h { width: 40px; height: 56px; margin: 0 -22px; font-size: 13px; } 
+    .card-v { width: 40px; height: 56px; margin: -25px 0; font-size: 13px; transform: rotate(90deg); }
+
+    .card-red { color: #d00; }
+    .card-black { color: #000; }
+    
+    .card-h.selected, .card-v.selected { transform: translateY(-15px) !important; border: 2px solid #00ffff; z-index: 100; }
+    .card-v.selected { transform: rotate(90deg) translateX(-15px) !important; }
+
+    .card-back {
+        background: #2c3e50;
+        background-image: repeating-linear-gradient(45deg, #34495e 0px, #34495e 10px, #2c3e50 10px, #2c3e50 20px);
+        border: 2px solid white;
+    }
+    .card-back::after { content: '🂠'; font-size: 20px; color: #888; }
+
+    /* --- CENTER TABLE AREA --- */
+    .center-table {
+        grid-column: 2; grid-row: 2;
+        background: #27ae60; border: 5px solid #1e3a28; border-radius: 15px;
+        display: grid; grid-template-rows: auto 1fr; gap: 10px; padding: 10px; position: relative;
+    }
+    
+    .piles-row { display: flex; justify-content: center; gap: 40px; align-items: center; }
+    
+    .discard-box { 
+        width: 70px; height: 98px; background: rgba(0,0,0,0.2); border: 2px dashed #aaa; 
+        border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative;
+    }
+    .discard-box:hover { border-color: #fff; }
+    .discard-card { font-size: 20px; }
+
+    .draw-box {
+        width: 70px; height: 98px; background: rgba(0,0,0,0.2); border: 2px solid #fff;
+        border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+    .draw-card { width: 60px; height: 90px; border-radius: 5px; }
+
+    .meld-area {
+        display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: 15px;
+        overflow-y: auto; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 8px;
+    }
+    
+    .meld-pile {
+        background: rgba(255,255,255,0.95); padding: 5px; border-radius: 6px;
+        min-width: 70px; text-align: center; border: 2px solid #333; cursor: pointer; position: relative;
+        transition: transform 0.2s; display: flex; flex-direction: column; align-items: center;
+    }
+    .meld-pile:hover { transform: scale(1.05); z-index: 10; }
+    
+    /* Canasta Styling */
+    .meld-pile.canasta {
+        border: 3px solid #ffd700;
+        box-shadow: 0 0 10px rgba(255,215,0,0.5);
+        background: #fff8e1;
+    }
+    .meld-pile.canasta::after {
+        content: '★ CANASTA';
+        position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+        background: #ffd700; color: #000; font-size: 9px; padding: 2px 6px; border-radius: 10px; font-weight: bold;
+    }
+
+    .meld-label { font-size: 10px; font-weight: bold; color: #333; margin-bottom: 2px; }
+    .meld-count { font-size: 9px; color: #555; margin-bottom: 2px; } 
+    .meld-cards { display: flex; justify-content: center; font-size: 14px; }
+    .mini-card { margin: 0px; width: 8px; overflow: hidden; display: inline-block; }
+
+    /* --- NEW ACTION BOX --- */
+    .action-box-container {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.9); border: 2px solid #00ffff; border-radius: 12px;
+        padding: 15px 25px; display: none; flex-direction: column; gap: 10px; z-index: 200;
+        box-shadow: 0 0 20px rgba(0,0,0,0.8); min-width: 250px;
+    }
+    .action-box-title { color: #00ffff; font-size: 16px; font-weight: bold; text-align: center; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 5px; }
+    .action-buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .action-btn { padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; color: white; font-weight: bold; transition: 0.2s; }
+    .btn-meld { background: #2980b9; } .btn-meld:hover { background: #3498db; }
+    .btn-add { background: #8e44ad; } .btn-add:hover { background: #9b59b6; }
+    .btn-discard { background: #d35400; } .btn-discard:hover { background: #e67e22; }
+    .btn-go-out { background: #c0392b; border: 1px solid #e74c3c; } .btn-go-out:hover { background: #e74c3c; }
+    .btn-cancel { background: #7f8c8d; margin-top: 5px; } .btn-cancel:hover { background: #95a5a6; }
+
+    /* --- OVERLAYS --- */
+    .msg-box {
+        position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+        background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; color: #fff; font-size: 14px; pointer-events: none; white-space: nowrap; z-index: 20; border: 1px solid #555;
+    }
+
+    .float-msg {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: rgba(0, 255, 255, 0.2); border: 2px solid #00ffff; color: #00ffff;
+        padding: 10px 20px; border-radius: 10px; font-weight: bold; display: none; pointer-events: none; z-index: 50;
+    }
+
+    /* Grid Positioning */
+    .p-north { grid-column: 2; grid-row: 1; }
+    .p-south { grid-column: 2; grid-row: 3; z-index: 10; background: rgba(0,0,0,0.5); }
+    .p-west { grid-column: 1; grid-row: 2; }
+    .p-east { grid-column: 3; grid-row: 2; }
+
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(0, 255, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0); } }
+
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+    <h1>🃏 CANASTA (3 DECKS) 🃏</h1>
+    <div class="controls">
+        <select id="gameMode" onchange="changeMode()">
+            <option value="teams">Teams (2v2)</option>
+            <option value="solo">Individuals (1v1v1v1)</option>
+        </select>
+        <button onclick="newGame()">New Game</button>
+        <button id="btnNextHand" class="btn-next-hand" onclick="nextHand()">Next Hand</button>
+        <button id="btnRecycle" class="btn-recycle" onclick="recycleDeck()">♻️ Recycle Deck</button>
+        
+        <!-- DROPDOWN HAND BUTTON -->
+        <div class="hand-dropdown">
+            <button onclick="toggleDropdown()" class="dropbtn">📋 My Hand</button>
+            <div id="myHandDropdown" class="dropdown-content">
+                <!-- Cards will be populated by JS -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="game-container">
+    <!-- North Player -->
+    <div class="player-area p-north" id="area-north">
+        <div class="player-info">NORTH (AI)</div>
+        <div class="red3-box" id="r3-north">Red 3s: 0</div>
+        <div class="stats-row">
+            <div class="stat-box">Score: <span id="score-north">0</span></div>
+            <div class="stat-box">Cards: <span id="count-north">0</span></div>
+        </div>
+        <div class="stats-row">
+            <div class="stat-box stat-canasta">Canastas: <span id="canastas-north">0</span>/3</div>
+        </div>
+        <div class="hand-container hand-vertical" id="hand-north"></div>
+    </div>
+
+    <!-- West Player -->
+    <div class="player-area p-west" id="area-west">
+        <div class="player-info">WEST (AI)</div>
+        <div class="red3-box" id="r3-west">Red 3s: 0</div>
+        <div class="stats-row">
+            <div class="stat-box">Score: <span id="score-west">0</span></div>
+            <div class="stat-box">Cards: <span id="count-west">0</span></div>
+        </div>
+        <div class="stats-row">
+            <div class="stat-box stat-canasta">Canastas: <span id="canastas-west">0</span>/3</div>
+        </div>
+        <div class="hand-container hand-vertical" id="hand-west"></div>
+    </div>
+
+    <!-- Center Table -->
+    <div class="center-table">
+        <div class="float-msg" id="floatMsg">FLOATING!</div>
+        <div class="msg-box" id="message">Welcome! Start a New Game.</div>
+        
+        <div class="piles-row">
+            <div class="draw-box" onclick="humanDraw()">
+                <div class="draw-card card-back"></div>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; align-items:center;">
+                <div class="discard-box" id="discardPile" ondrop="dropDiscard(event)" ondragover="allowDrop(event)">
+                    <span id="discardContent">Empty</span>
+                </div>
+                <button id="btnPickup" onclick="attemptPickup()" style="margin-top:5px; font-size:9px; padding:2px 5px; display:none;">Pickup</button>
+            </div>
+        </div>
+
+        <div class="meld-area" id="tableMelds"></div>
+
+        <!-- NEW ACTION BOX HTML -->
+        <div id="actionBox" class="action-box-container">
+            <div class="action-box-title">SELECTED CARDS</div>
+            <div class="action-buttons">
+                <button class="action-btn btn-meld" onclick="humanNewMeld()">New Meld</button>
+                <button class="action-btn btn-add" onclick="attemptAddToSelectedMeld()">Add to Meld</button>
+                <button class="action-btn btn-discard" onclick="discardSelected()">Discard</button>
+                <button class="action-btn btn-go-out" onclick="discardAndGoOut()">Discard & Go Out</button>
+            </div>
+            <button class="action-btn btn-cancel" onclick="deselectAll()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- East Player -->
+    <div class="player-area p-east" id="area-east">
+        <div class="player-info">EAST (AI)</div>
+        <div class="red3-box" id="r3-east">Red 3s: 0</div>
+        <div class="stats-row">
+            <div class="stat-box">Score: <span id="score-east">0</span></div>
+            <div class="stat-box">Cards: <span id="count-east">0</span></div>
+        </div>
+        <div class="stats-row">
+            <div class="stat-box stat-canasta">Canastas: <span id="canastas-east">0</span>/3</div>
+        </div>
+        <div class="hand-container hand-vertical" id="hand-east"></div>
+    </div>
+
+    <!-- South Player (Human) -->
+    <div class="player-area p-south" id="area-south">
+        <div class="player-info">SOUTH (YOU)</div>
+        <div class="red3-box" id="r3-south">Red 3s: 0</div>
+        <div class="stats-row">
+            <div class="stat-box">Score: <span id="score-south">0</span></div>
+            <div class="stat-box">Cards: <span id="count-south">0</span></div>
+        </div>
+        <div class="stats-row">
+            <div class="stat-box stat-canasta">Canastas: <span id="canastas-south">0</span>/3</div>
+        </div>
+        <div class="hand-container hand-horizontal" id="hand-south"></div>
+    </div>
+</div>
+
+<script>
+    // --- CONFIG ---
+    const SUITS = ['♠', '♣', '♥', '♦'];
+    const RANKS = ['4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2', '3', 'Joker'];
+    const CARD_VALUES = { 'Joker': 50, '2': 20, 'A': 20, 'K': 15, 'Q': 15, 'J': 15, '10': 15, '9': 15, '8': 15, '7': 5, '6': 5, '5': 5, '4': 5, '3': 5 };
+    const PLAYERS = ['south', 'west', 'north', 'east'];
+
+    // --- STATE ---
+    const game = {
+        deck: [],
+        hands: { south: [], west: [], north: [], east: [] },
+        discard: [],
+        melds: [],
+        red3s: { south: 0, west: 0, north: 0, east: 0 },
+        scores: { south: 0, west: 0, north: 0, east: 0 },
+        canastaCounts: { south: 0, west: 0, north: 0, east: 0 },
+        hasMelded: { south: false, west: false, north: false, east: false },
+        isFloating: { south: false, west: false, north: false, east: false },
+        
+        mode: 'teams', 
+        currentPlayerIndex: 0,
+        hasDrawn: false,
+        selectedCardIds: new Set(),
+        isGameOver: false,
+        isMatchOver: false // Flag to indicate match is over (someone hit 10k)
+    };
+
+    // --- UTILS ---
+    function msg(text) { 
+        const el = document.getElementById('message');
+        el.textContent = text; 
+        el.style.opacity = 1;
+    }
+
+    function areTeammates(p1, p2) {
+        if (game.mode === 'solo') return false;
+        const idx1 = PLAYERS.indexOf(p1);
+        const idx2 = PLAYERS.indexOf(p2);
+        return (idx1 % 2) === (idx2 % 2);
+    }
+
+    function getOwnerGroup(p) {
+        if (game.mode === 'solo') return p;
+        const idx = PLAYERS.indexOf(p);
+        return (idx % 2 === 0) ? 'team1' : 'team2';
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+    function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } }
+
+    function changeMode() {
+        game.mode = document.getElementById('gameMode').value;
+        newGame();
+    }
+
+    // --- DROPDOWN HAND LOGIC ---
+    function toggleDropdown() {
+        document.getElementById("myHandDropdown").classList.toggle("show");
+        updateDropdownHand();
+    }
+
+    // Close dropdown if user clicks outside
+    window.onclick = function(event) {
+        if (!event.target.matches('.dropbtn')) {
+            var dropdowns = document.getElementsByClassName("dropdown-content");
+            for (var i = 0; i < dropdowns.length; i++) {
+                var openDropdown = dropdowns[i];
+                if (openDropdown.classList.contains('show')) {
+                    openDropdown.classList.remove('show');
+                }
+            }
+        }
+    }
+
+    function updateDropdownHand() {
+        const ddContent = document.getElementById("myHandDropdown");
+        ddContent.innerHTML = "";
+        
+        const hand = game.hands.south;
+        if (hand.length === 0) {
+            ddContent.innerHTML = "<div style='color:#333; padding:10px; text-align:center;'>Hand is empty</div>";
+            return;
+        }
+
+        // Sort and display
+        const sortedHand = [...hand].sort((a,b) => {
+            if(a.rank !== b.rank) return RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank);
+            return SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit);
+        });
+
+        sortedHand.forEach(card => {
+            const div = document.createElement('div');
+            div.className = 'dropdown-card';
+            
+            const isSelected = game.selectedCardIds.has(card.id);
+            const colorClass = (card.suit === '♥' || card.suit === '♦') ? 'card-red' : 'card-black';
+            
+            div.innerHTML = `
+                <div style="font-weight:bold; ${isSelected ? 'color:#d35400' : ''}">${card.rank}${card.suit}</div>
+                <div class="mini-dropdown-card ${colorClass}">${card.rank}</div>
+            `;
+            
+            // Optional: Click to select/deselect from dropdown
+            div.onclick = (e) => {
+                e.stopPropagation();
+                if(!isMyTurn() || !game.hasDrawn) return;
+                if(game.selectedCardIds.has(card.id)) game.selectedCardIds.delete(card.id);
+                else game.selectedCardIds.add(card.id);
+                updateDropdownHand(); // Re-render to show selection
+                updateUI(); // Update main UI
+            };
+
+            ddContent.appendChild(div);
+        });
+    }
+
+    // --- SETUP ---
+    function newGame() {
+        // Reset everything including scores
+        game.scores = { south: 0, west: 0, north: 0, east: 0 };
+        game.isMatchOver = false;
+        resetHandState();
+        msg('New Game Started! First to 10,000 wins.');
+    }
+
+    function nextHand() {
+        if (game.isMatchOver) return;
+        resetHandState();
+        msg('Next Hand Started!');
+    }
+
+    function resetHandState() {
+        game.isGameOver = false;
+        game.deck = [];
+        game.melds = [];
+        game.discard = [];
+        game.red3s = { south: 0, west: 0, north: 0, east: 0 };
+        game.canastaCounts = { south: 0, west: 0, north: 0, east: 0 }; 
+        game.hasMelded = { south: false, west: false, north: false, east: false };
+        game.isFloating = { south: false, west: false, north: false, east: false }; 
+        game.currentPlayerIndex = 0;
+        game.hasDrawn = false;
+        game.selectedCardIds.clear();
+
+        PLAYERS.forEach(p => game.hands[p] = []);
+        
+        // 3 DECKS (156 cards)
+        let id = 0;
+        for (let d = 0; d < 3; d++) {
+            SUITS.forEach(s => RANKS.forEach(r => {
+                if (r !== 'Joker') game.deck.push({ id: id++, rank: r, suit: s });
+            }));
+            game.deck.push({ id: id++, rank: 'Joker', suit: '🃏' });
+            game.deck.push({ id: id++, rank: 'Joker', suit: '🃏' });
+        }
+        shuffle(game.deck);
+
+        // Deal 7 cards each
+        PLAYERS.forEach(p => { for(let i=0; i<7; i++) { if(game.deck.length) game.hands[p].push(game.deck.pop()); }});
+
+        // Initial Discard
+        if(game.deck.length) {
+            let c = game.deck.pop();
+            while(c.rank === 'Joker' || c.rank === '3' || c.rank === '2') {
+                game.deck.unshift(c); c = game.deck.pop();
+            }
+            game.discard.push(c);
+        }
+
+        updateUI();
+    }
+
+    function recycleDeck() {
+        if (game.deck.length > 0) return;
+        if (game.discard.length <= 1) { msg("Cannot recycle."); return; }
+        const topCard = game.discard.pop();
+        const toShuffle = [...game.discard];
+        game.discard = [topCard];
+        shuffle(toShuffle);
+        game.deck = toShuffle;
+        msg("Deck Recycled!");
+        updateUI();
+    }
+
+    function humanDraw() {
+        if (!isMyTurn()) return;
+        if (game.hasDrawn) { msg("Already drawn!"); return; }
+        if (game.deck.length === 0) { msg("Deck empty! Click Recycle."); return; }
+
+        performDraw(0);
+        updateUI();
+        msg('Drew 2 cards.');
+    }
+
+    function performDraw(pIdx) {
+        for(let i=0; i<2; i++) {
+            if(game.deck.length) game.hands[PLAYERS[pIdx]].push(game.deck.pop());
+        }
+        game.hasDrawn = true;
+        
+        if (game.hands[PLAYERS[pIdx]].length === 0) {
+            game.isFloating[PLAYERS[pIdx]] = true;
+        }
+        
+        checkRedThrees(pIdx);
+    }
+
+    function checkRedThrees(pIdx) {
+        const hand = game.hands[PLAYERS[pIdx]];
+        const p = PLAYERS[pIdx];
+        for(let i=hand.length-1; i>=0; i--) {
+            const c = hand[i];
+            if(c.rank === '3' && (c.suit === '♥' || c.suit === '♦')) {
+                hand.splice(i, 1);
+                game.red3s[p]++;
+                if(game.deck.length) hand.push(game.deck.pop());
+            }
+        }
+    }
+
+    function attemptPickup() {
+        if (!isMyTurn()) return;
+        if (game.hasDrawn) { msg("Already acted!"); return; }
+        if (game.discard.length === 0) return;
+
+        const topCard = game.discard[game.discard.length-1];
+        const hand = game.hands.south;
+
+        if (topCard.rank === '3' && (topCard.suit === '♠' || topCard.suit === '♣')) { msg("Blocked by Black 3."); return; }
+        if (topCard.rank === 'Joker' || topCard.rank === '2') { msg("Cannot pickup wilds."); return; }
+
+        const naturalsInHand = hand.filter(c => c.rank === topCard.rank).length;
+        if (naturalsInHand < 2) { msg(`Need two ${topCard.rank}s.`); return; }
+
+        while(game.discard.length) hand.push(game.discard.pop());
+        game.hasDrawn = true;
+        updateUI();
+        msg('Picked up pile!');
+    }
+
+    // --- MELD ACTIONS ---
+    function onMeldClick(meldId) {
+        if (!isMyTurn() || !game.hasDrawn) return;
+        const meld = game.melds.find(m => m.id === meldId);
+        if (!meld) return;
+        
+        if (!areTeammates('south', meld.owner)) { msg("Not your meld."); return; }
+        
+        // Select the meld target internally for "Add to Meld" button
+        game.targetMeldId = meldId;
+        
+        const selectedCards = game.hands.south.filter(c => game.selectedCardIds.has(c.id));
+        if (selectedCards.length === 0) { 
+            msg("Select cards from hand to add."); 
+            return; 
+        }
+        
+        if (meld.rank === '3' && selectedCards.some(c => c.rank === '2' || c.rank === 'Joker')) {
+             msg("No wilds in Black 3s."); return;
+        }
+
+        if (validateAddToMeld(selectedCards, meld)) {
+            executeAddToMeld(0, meld, selectedCards);
+            game.selectedCardIds.clear();
+            updateUI();
+            msg("Added to meld!");
+        } else {
+            msg("Invalid addition.");
+        }
+    }
+
+    function attemptAddToSelectedMeld() {
+        if (!isMyTurn() || !game.hasDrawn) return;
+        const selectedCards = game.hands.south.filter(c => game.selectedCardIds.has(c.id));
+        if (selectedCards.length === 0) { msg("Select cards first."); return; }
+
+        // If user clicked a meld previously, use it, otherwise check if only 1 valid meld exists
+        let targetMeld = game.melds.find(m => m.id === game.targetMeldId);
+        
+        // If no target meld explicitly set yet, try to auto-detect based on cards
+        if (!targetMeld) {
+            const myMelds = game.melds.filter(m => areTeammates('south', m.owner));
+            const candidates = myMelds.filter(m => validateAddToMeld(selectedCards, m));
+            
+            if (candidates.length === 0) { msg("No valid meld to add to. Click a meld first."); return; }
+            if (candidates.length > 1) { msg("Multiple valid melds. Click the specific meld first."); return; }
+            targetMeld = candidates[0];
+        }
+
+        if (validateAddToMeld(selectedCards, targetMeld)) {
+            executeAddToMeld(0, targetMeld, selectedCards);
+            game.selectedCardIds.clear();
+            game.targetMeldId = null; // Reset target
+            updateUI();
+            msg("Added to meld!");
+        } else {
+            msg("Invalid addition.");
+        }
+    }
+
+    function humanNewMeld() {
+        if (!isMyTurn()) return;
+        const selected = game.hands.south.filter(c => game.selectedCardIds.has(c.id));
+        const valid = validateNewMeld(selected, 0);
+        if (valid.valid) {
+            createNewMeld(0, selected, valid.rank);
+            game.selectedCardIds.clear();
+            updateUI();
+            msg(`Melded ${valid.rank}s!`);
+        } else {
+            msg(valid.reason);
+        }
+    }
+
+    function validateAddToMeld(cards, targetMeld) {
+        const targetRank = targetMeld.rank;
+        for (let c of cards) {
+            const isWild = (c.rank === '2' || c.rank === 'Joker');
+            const isMatch = (c.rank === targetRank);
+            if (!isWild && !isMatch) return false;
+        }
+        const allCards = [...targetMeld.cards, ...cards];
+        const naturals = allCards.filter(c => c.rank !== '2' && c.rank !== 'Joker').length;
+        const wilds = allCards.filter(c => c.rank === '2' || c.rank === 'Joker').length;
+        if (targetRank === '3') return wilds === 0;
+        return (naturals > wilds);
+    }
+
+    function validateNewMeld(cards, pIdx) {
+        if (cards.length < 3) return { valid: false, reason: "Need 3+ cards." };
+        const wilds = cards.filter(c => c.rank === '2' || c.rank === 'Joker');
+        const naturals = cards.filter(c => c.rank !== '2' && c.rank !== 'Joker');
+        const naturalRanks = [...new Set(naturals.map(c => c.rank))];
+        if (naturalRanks.length > 1) return { valid: false, reason: "Mixed ranks." };
+        if (naturals.length === 0) return { valid: false, reason: "Need naturals." };
+        const rank = naturalRanks[0];
+
+        if (rank === '3') {
+            if (wilds.length > 0) return { valid: false, reason: "No wilds in 3s." };
+            return { valid: true, rank: '3' };
+        }
+        if (naturals.length <= wilds.length) return { valid: false, reason: "Too many wilds." };
+
+        const p = PLAYERS[pIdx];
+        if (!game.hasMelded[p]) {
+            const points = cards.reduce((s,c) => s + (CARD_VALUES[c.rank]||0), 0);
+            const min = getMinimumMeldScore(pIdx);
+            if (points < min) return { valid: false, reason: `Initial needs ${min} pts.` };
+        }
+        return { valid: true, rank: rank };
+    }
+
+    function createNewMeld(pIdx, cards, rank) {
+        const player = PLAYERS[pIdx];
+        const hand = game.hands[player];
+        cards.forEach(c => { const idx = hand.findIndex(h => c.id === h.id); if(idx>-1) hand.splice(idx, 1); });
+        
+        game.melds.push({
+            id: Date.now() + Math.random(),
+            rank: rank,
+            owner: player,
+            cards: cards
+        });
+        
+        game.hasMelded[player] = true;
+        
+        checkCanasta(player, cards.length);
+
+        const points = cards.reduce((s,c) => s + (CARD_VALUES[c.rank]||0), 0);
+        game.scores[player] += points;
+    }
+
+    function executeAddToMeld(pIdx, meld, cards) {
+        const player = PLAYERS[pIdx];
+        const hand = game.hands[player];
+        cards.forEach(c => { const idx = hand.findIndex(h => c.id === h.id); if(idx>-1) hand.splice(idx, 1); });
+        meld.cards.push(...cards);
+        
+        checkCanasta(player, meld.cards.length);
+
+        const points = cards.reduce((s,c) => s + (CARD_VALUES[c.rank]||0), 0);
+        game.scores[player] += points;
+    }
+
+    function checkCanasta(player, currentMeldSize) {
+        let count = 0;
+        const team = getOwnerGroup(player);
+        const playerMelds = game.melds.filter(m => getOwnerGroup(m.owner) === team);
+        
+        playerMelds.forEach(m => {
+            if (m.cards.length >= 7) count++;
+        });
+        
+        game.canastaCounts[player] = count;
+    }
+
+    function getMinimumMeldScore(pIdx) {
+        const p = PLAYERS[pIdx];
+        const s = game.scores[p];
+        if (s < 0) return 150;
+        if (s < 1500) return 50;
+        if (s < 3000) return 90;
+        return 120;
+    }
+
+    // --- DISCARD & END TURN ---
+    function discardSelected() {
+        if (!isMyTurn() || !game.hasDrawn) { msg("Draw first!"); return; }
+        const selected = game.hands.south.filter(c => game.selectedCardIds.has(c.id));
+        if (selected.length !== 1) { msg("Select exactly 1 card to discard."); return; }
+        
+        const c = selected[0];
+        if (c.rank === '3' && (c.suit === '♥' || c.suit === '♦')) { msg("No discard red 3s."); return; }
+        
+        game.discard.push(c);
+        const idx = game.hands.south.findIndex(x => x.id === c.id);
+        game.hands.south.splice(idx, 1);
+        game.selectedCardIds.clear();
+        endTurn();
+    }
+
+    function discardAndGoOut() {
+        if (!isMyTurn()) return;
+        const selected = game.hands.south.filter(c => game.selectedCardIds.has(c.id));
+        if (selected.length !== 1) { msg("Select 1 card to discard."); return; }
+        
+        const c = selected[0];
+        if (c.rank === '3' && (c.suit === '♥' || c.suit === '♦')) { msg("No discard red 3s."); return; }
+
+        // Check Go Out conditions
+        let totalCanastas = 0;
+        if (game.mode === 'teams') totalCanastas = game.canastaCounts.south + game.canastaCounts.north;
+        else totalCanastas = game.canastaCounts.south;
+
+        if (totalCanastas < 3) {
+            msg(`Need 3 Canastas to go out. You have ${totalCanastas}.`); 
+            return;
+        }
+
+        // If we have more than this 1 card + the discard, we can't go out
+        if (game.hands.south.length > 1) { 
+            msg("Must meld all cards except discard to go out."); 
+            return; 
+        }
+
+        // Perform discard
+        game.discard.push(c);
+        const idx = game.hands.south.findIndex(x => x.id === c.id);
+        game.hands.south.splice(idx, 1);
+        game.selectedCardIds.clear();
+        
+        game.isGameOver = true;
+        calculateScore();
+    }
+
+    function discardCard(cardId) {
+        // Legacy function for drag/drop, maps to new logic
+        game.selectedCardIds.clear();
+        game.selectedCardIds.add(cardId);
+        updateUI(); // Triggers selection visual
+        discardSelected();
+    }
+
+    // --- SCORING ---
+    function calculateScore() {
+        msg("Hand Over! Calculating Scores...");
+        
+        // Identify winner(s)
+        const winner = PLAYERS[game.currentPlayerIndex]; // The one who just went out
+        
+        let scoreReport = "";
+        let matchWinner = null;
+        
+        // Process penalties
+        PLAYERS.forEach(p => {
+            if (p === winner) return; // Winner doesn't get penalized
+            
+            const hand = game.hands[p];
+            let penalty = 0;
+            
+            hand.forEach(c => {
+                // Red 3s in hand at end = 500 penalty
+                if (c.rank === '3' && (c.suit === '♥' || c.suit === '♦')) {
+                    penalty += 500; 
+                } else {
+                    penalty += (CARD_VALUES[c.rank] || 0);
+                }
+            });
+            
+            // Deduct from loser's score
+            game.scores[p] -= penalty;
+            scoreReport += `${p.toUpperCase()}: -${penalty}. `;
+            
+            // Check for Match Winner (10k)
+            if (game.scores[p] >= 10000) matchWinner = p;
+        });
+
+        // Also check winner for 10k just in case
+        if (game.scores[winner] >= 10000) matchWinner = winner;
+
+        if (matchWinner) {
+            game.isMatchOver = true;
+            msg(`🏆 MATCH OVER! ${matchWinner.toUpperCase()} REACHES 10,000! 🏆`);
+            updateUI(); // Show final scores
+        } else {
+            msg(`🏆 ${winner.toUpperCase()} WINS HAND! 🏆 ${scoreReport}`);
+            updateUI();
+        }
+    }
+
+    function endTurn() {
+        const currPlayer = PLAYERS[game.currentPlayerIndex];
+        if (game.hands[currPlayer].length === 0 && game.hasDrawn) {
+            game.isFloating[currPlayer] = true;
+            msg(`${currPlayer.toUpperCase()} is Floating!`);
+        } else {
+            game.isFloating[currPlayer] = false;
+        }
+
+        game.hasDrawn = false;
+        game.selectedCardIds.clear();
+        game.targetMeldId = null; // Clear meld selection
+        game.currentPlayerIndex = (game.currentPlayerIndex + 1) % 4;
+        
+        // Clear status box when turn changes as requested
+        document.getElementById('message').textContent = '';
+        
+        if (game.isGameOver) return; 
+
+        updateUI();
+        if (game.currentPlayerIndex !== 0) setTimeout(runAITurn, 1500);
+        else msg("Your Turn.");
+    }
+
+    // --- AI ---
+    async function runAITurn() {
+        const pIdx = game.currentPlayerIndex;
+        const player = PLAYERS[pIdx];
+        msg(`${player.toUpperCase()} playing...`);
+
+        await sleep(800);
+        if (game.deck.length === 0 && game.discard.length > 1) recycleDeck();
+        performDraw(pIdx);
+        updateUI();
+
+        await sleep(800);
+        const hand = game.hands[player];
+        let acted = false;
+        const teamMelds = game.melds.filter(m => areTeammates(player, m.owner));
+
+        for (let m of teamMelds) {
+             const match = hand.find(c => c.rank === m.rank);
+             if (match && validateAddToMeld([match], m)) {
+                 executeAddToMeld(pIdx, m, [match]); acted = true; break;
+             }
+        }
+        if(!acted) {
+             let groups = {};
+             hand.forEach(c => { if(!groups[c.rank]) groups[c.rank]=[]; groups[c.rank].push(c); });
+             for (let rank in groups) {
+                 const group = groups[rank];
+                 if (group.length >= 3 && rank !== 'Joker' && rank !== '2') {
+                     const v = validateNewMeld(group, pIdx);
+                     if(v.valid) { createNewMeld(pIdx, group, v.rank); acted = true; break; }
+                 }
+             }
+        }
+        updateUI();
+
+        await sleep(800);
+        if(hand.length > 0) {
+            let candidates = hand.filter(c => c.rank !== '3' && c.rank !== '2' && c.rank !== 'Joker');
+            if(candidates.length === 0) candidates = hand;
+            const toDiscard = candidates.sort((a,b) => (CARD_VALUES[a.rank]||0) - (CARD_VALUES[b.rank]||0))[0];
+            const idx = hand.findIndex(c => c.id === toDiscard.id);
+            hand.splice(idx, 1);
+            game.discard.push(toDiscard);
+        }
+
+        endTurn();
+    }
+
+    // --- UI ---
+    function updateUI() {
+        const humanTurn = isMyTurn();
+        
+        PLAYERS.forEach(p => {
+            document.getElementById(`score-${p}`).textContent = game.scores[p];
+            document.getElementById(`count-${p}`).textContent = game.hands[p].length;
+            document.getElementById(`canastas-${p}`).textContent = game.canastaCounts[p];
+            document.getElementById(`r3-${p}`).textContent = `Red 3s: ${game.red3s[p]}`;
+            
+            const area = document.getElementById(`area-${p}`);
+            area.className = `player-area p-${p}`;
+            if(PLAYERS.indexOf(p) === game.currentPlayerIndex) area.classList.add('active-turn');
+            if(game.isFloating[p]) area.classList.add('floating');
+        });
+
+        const floatMsg = document.getElementById('floatMsg');
+        if (game.isFloating.south) {
+            floatMsg.style.display = 'block';
+            floatMsg.textContent = "YOU ARE FLOATING! Discard any card to end.";
+        } else {
+            floatMsg.style.display = 'none';
+        }
+
+        // Discard
+        const dEl = document.getElementById('discardContent');
+        const dBox = document.getElementById('discardPile');
+        if(game.discard.length > 0) {
+            const t = game.discard[game.discard.length-1];
+            const col = (t.suit==='♥'||t.suit==='♦')?'card-red':'card-black';
+            dEl.innerHTML = `<span class="${col}" style="font-size:20px;">${t.rank}${t.suit}</span>`;
+        } else { dEl.textContent = 'Empty'; }
+        
+        document.getElementById('btnRecycle').style.display = (game.deck.length === 0 && game.discard.length > 1) ? 'inline-block' : 'none';
+        document.getElementById('btnPickup').style.display = (humanTurn && !game.hasDrawn && game.discard.length>0) ? 'block' : 'none';
+
+        // Melds
+        const mContainer = document.getElementById('tableMelds');
+        mContainer.innerHTML = '';
+        game.melds.forEach(m => {
+            const div = document.createElement('div');
+            div.className = 'meld-pile';
+            
+            if (m.cards.length >= 7) {
+                div.classList.add('canasta');
+            }
+
+            div.style.borderColor = areTeammates('south', m.owner) ? '#ffd700' : '#34495e';
+            
+            const lastCards = m.cards.slice(-3).map(c => 
+                `<span class="mini-card ${(c.suit==='♥'||c.suit==='♦')?'card-red':'card-black'}">${c.rank}</span>`
+            ).join('');
+            
+            const countBadge = m.cards.length >= 7 ? "7/7" : `${m.cards.length}/7`;
+            
+            div.innerHTML = `<div class="meld-label">${m.owner.toUpperCase()} ${m.rank}s</div><div class="meld-count">${countBadge}</div><div class="meld-cards">${lastCards}</div>`;
+            
+            if (humanTurn && game.hasDrawn && areTeammates('south', m.owner)) {
+                div.onclick = () => onMeldClick(m.id);
+                div.style.cursor = "pointer";
+            } else {
+                div.style.cursor = "default";
+            }
+            mContainer.appendChild(div);
+        });
+
+        PLAYERS.forEach(p => renderHand(p));
+
+        // --- ACTION BOX LOGIC ---
+        const actionBox = document.getElementById('actionBox');
+        const btnGoOut = actionBox.querySelector('.btn-go-out');
+        
+        if (humanTurn && !game.isGameOver) {
+            // Show action box if cards selected
+            if (game.selectedCardIds.size > 0) {
+                actionBox.style.display = 'flex';
+                
+                // Check Go Out Visibility
+                let totalCanastas = 0;
+                if (game.mode === 'teams') totalCanastas = game.canastaCounts.south + game.canastaCounts.north;
+                else totalCanastas = game.canastaCounts.south;
+
+                // Can only go out if 1 card selected (to discard) and that's the last card
+                const aboutToEmpty = (game.hands.south.length === 1 && game.selectedCardIds.size === 1);
+                const canGoOut = (totalCanastas >= 3 && aboutToEmpty);
+                
+                if (canGoOut) {
+                    btnGoOut.style.display = 'inline-block';
+                } else {
+                    btnGoOut.style.display = 'none';
+                }
+
+            } else {
+                actionBox.style.display = 'none';
+            }
+        } else {
+            actionBox.style.display = 'none';
+        }
+
+        // --- NEXT HAND BUTTON LOGIC ---
+        const btnNextHand = document.getElementById('btnNextHand');
+        if (game.isGameOver && !game.isMatchOver) {
+            btnNextHand.style.display = 'inline-block';
+            btnNextHand.disabled = false;
+        } else {
+            btnNextHand.style.display = 'none';
+            if (game.isMatchOver) btnNextHand.disabled = true;
+        }
+        
+        // Update dropdown hand if open
+        const dd = document.getElementById("myHandDropdown");
+        if (dd.classList.contains('show')) {
+            updateDropdownHand();
+        }
+    }
+
+    function renderHand(player) {
+        const hEl = document.getElementById(`hand-${player}`);
+        hEl.innerHTML = '';
+        const hand = game.hands[player];
+        const isHuman = (player === 'south');
+        
+        let sortedHand = isHuman ? [...hand].sort((a,b) => {
+            if(a.rank !== b.rank) return RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank);
+            return SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit);
+        }) : hand;
+
+        sortedHand.forEach(card => {
+            const cEl = document.createElement('div');
+            const orient = (player === 'south' || player === 'north') ? 'card-h' : 'card-v';
+            cEl.className = `card ${orient}`;
+
+            if (!isHuman) {
+                cEl.classList.add('card-back');
+            } else {
+                const col = (card.suit==='♥'||card.suit==='♦')?'card-red':'card-black';
+                cEl.classList.add(col);
+                cEl.innerHTML = `<div style="font-size:12px;">${card.rank}</div><div style="font-size:20px;">${card.suit}</div>`;
+                
+                if(game.selectedCardIds.has(card.id)) cEl.classList.add('selected');
+                
+                cEl.draggable = true;
+                cEl.ondragstart = e => { 
+                    if(!isMyTurn() || !game.hasDrawn) e.preventDefault();
+                    else { e.dataTransfer.setData('text/plain', card.id); }
+                };
+                cEl.onclick = () => {
+                    if(!isMyTurn() || !game.hasDrawn) return;
+                    if(game.selectedCardIds.has(card.id)) game.selectedCardIds.delete(card.id);
+                    else game.selectedCardIds.add(card.id);
+                    updateUI();
+                };
+            }
+            hEl.appendChild(cEl);
+        });
+
+        if(isHuman) {
+            const dBox = document.getElementById('discardPile');
+            dBox.ondragover = e => { e.preventDefault(); };
+            dBox.ondrop = e => {
+                e.preventDefault();
+                if(isMyTurn() && game.hasDrawn) discardCard(Number(e.dataTransfer.getData('text/plain')));
+            };
+        }
+    }
+
+    function deselectAll() {
+        game.selectedCardIds.clear();
+        updateUI();
+    }
+
+    function isMyTurn() { return game.currentPlayerIndex === 0; }
+
+    msg('New Game ready!');
+</script>
+</body>
+</html>

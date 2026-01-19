@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaplan Games - Home</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #000000 0%, #1a3a1a 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .menu-container {
+            background: #000000;
+            border: 3px solid #FFD700;
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 20px 60px rgba(255, 215, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #FFD700;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 255, 0, 0.3);
+        }
+
+        .menu-options {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .menu-button {
+            display: block;
+            padding: 20px 30px;
+            background: linear-gradient(135deg, #00AA00 0%, #006600 100%);
+            color: #FFD700;
+            text-decoration: none;
+            border-radius: 12px;
+            font-size: 1.3em;
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
+            border: 2px solid #FFD700;
+            cursor: pointer;
+        }
+
+        .menu-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+            background: linear-gradient(135deg, #00CC00 0%, #00AA00 100%);
+            border-color: #FFED4E;
+        }
+
+        .menu-button:active {
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <div class="menu-container">
+        <h1>🎮 Kaplan Games</h1>
+        <div class="menu-options">
+            <a href="canasta.html" class="menu-button">
+                🃏 Kaplan Canasta
+            </a>
+            
+            <a href="canasta-multi.html" class="menu-button">
+                🎴 Kaplan Canasta - Multi
+            </a>
+            
+            <a href="euchre.html" class="menu-button">
+                🎲 Kaplan Euchre
+            </a>
+        </div>
+    </div>
+</body>
+</html>
