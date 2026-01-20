@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Canasta - Mobile</title>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1e5128 0%, #2d6a4f 100%);
+    color: white;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+#game-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Header */
+#header {
+    background: rgba(0,0,0,0.5);
+    padding: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+#score-display {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+#turn-indicator {
+    font-size: 12px;
+    padding: 4px 8px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 12px;
+}
+
+/* Main play area */
+#play-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 4px;
+}
+
+/* Opponent hand (top) */
+#opponent-area {
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    margin-bottom: 4px;
+}
+
+/* Center area with deck, discard, melds */
+#center-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    gap: 8px;
+}
+
+#deck-discard-area {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-shrink: 0;
+    padding: 8px 0;
+}
+
+.pile {
+    width: 70px;
+    height: 98px;
+    border-radius: 8px;
+    border: 2px solid white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    position: relative;
+    background: #fff;
+    color: #000;
+}
+
+#deck {
+    background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+    color: white;
+}
+
+#discard-pile {
+    background: rgba(255,255,255,0.9);
+}
+
+.pile.frozen::after {
+    content: '🧊';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 16px;
+}
+
+/* Melds area */
+#melds-area {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px;
+}
+
+.team-melds {
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.team-melds h3 {
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.meld-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+
+.meld {
+    display: flex;
+    gap: 2px;
+    padding: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    flex-wrap: wrap;
+}
+
+/* Player hand (bottom) */
+#player-hand {
+    height: 140px;
+    display: flex;
+    overflow-x: auto;
+    gap: 4px;
+    padding: 8px 4px;
+    background: rgba(0,0,0,0.3);
+    align-items: flex-start;
+    flex-shrink: 0;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Cards */
+.card {
+    width: 50px;
+    height: 70px;
+    border-radius: 6px;
+    border: 1px solid #333;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 2px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+}
+
+.card.red {
+    color: #c41e3a;
+}
+
+.card.black {
+    color: #000;
+}
+
+.card.selected {
+    transform: translateY(-15px);
+    box-shadow: 0 0 15px rgba(255,215,0,0.8);
+    border: 2px solid gold;
+}
+
+.card.wild {
+    background: linear-gradient(135deg, #fff 0%, #f0f0f0 100%);
+}
+
+.card.opponent {
+    background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+    color: white;
+}
+
+.card-rank {
+    font-size: 14px;
+}
+
+.card-suit {
+    font-size: 18px;
+}
+
+.card-value {
+    font-size: 8px;
+    position: absolute;
+    bottom: 2px;
+    right: 4px;
+    opacity: 0.7;
+}
+
+/* Action buttons */
+#action-buttons {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    background: rgba(0,0,0,0.5);
+    overflow-x: auto;
+    flex-shrink: 0;
+    -webkit-overflow-scrolling: touch;
+}
+
+.action-btn {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.action-btn:active {
+    transform: scale(0.95);
+}
+
+.action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.action-btn.primary {
+    background: #4CAF50;
+    color: white;
+}
+
+.action-btn.danger {
+    background: #f44336;
+    color: white;
+}
+
+.action-btn.secondary {
+    background: #2196F3;
+    color: white;
+}
+
+.action-btn.warning {
+    background: #ff9800;
+    color: white;
+}
+
+/* Messages */
+#message {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.9);
+    color: white;
+    padding: 16px 24px;
+    border-radius: 12px;
+    font-size: 14px;
+    max-width: 80%;
+    text-align: center;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+#message.show {
+    display: block;
+    animation: fadeInOut 2s;
+}
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0; }
+    10%, 90% { opacity: 1; }
+}
+
+/* Landscape mode adjustments */
+@media (orientation: landscape) {
+    #play-area {
+        flex-direction: row;
+    }
+    
+    #center-area {
+        flex: 1;
+    }
+    
+    #player-hand {
+        height: auto;
+        width: 200px;
+        flex-direction: column;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+    
+    #action-buttons {
+        flex-direction: column;
+        width: 120px;
+        overflow-y: auto;
+    }
+}
+
+/* Small screens */
+@media (max-width: 380px) {
+    .card {
+        width: 44px;
+        height: 62px;
+    }
+    
+    .pile {
+        width: 60px;
+        height: 84px;
+    }
+}
+
+/* Red 3s display */
+#red3s-display {
+    background: rgba(255,0,0,0.2);
+    padding: 4px;
+    border-radius: 4px;
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+/* Canasta indicators */
+.canasta-badge {
+    background: gold;
+    color: #000;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    margin-left: 4px;
+}
+
+.natural-canasta {
+    background: #4CAF50;
+    color: white;
+}
+
+.mixed-canasta {
+    background: #ff9800;
+    color: white;
+}
+</style>
+</head>
+<body>
+<div id="game-container">
+    <div id="header">
+        <div id="score-display">
+            Team 1: <span id="team1-score">0</span> | 
+            Team 2: <span id="team2-score">0</span>
+        </div>
+        <div id="turn-indicator">Hand: <span id="hand-num">1</span></div>
+    </div>
+    
+    <div id="play-area">
+        <div id="opponent-area"></div>
+        
+        <div id="center-area">
+            <div id="deck-discard-area">
+                <div id="deck" class="pile">
+                    <div>Draw<br><span id="deck-count">156</span></div>
+                </div>
+                <div id="discard-pile" class="pile">
+                    <div id="discard-top">Empty</div>
+                </div>
+            </div>
+            
+            <div id="melds-area">
+                <div class="team-melds">
+                    <h3>Our Team <span id="our-canastas"></span></h3>
+                    <div id="our-melds" class="meld-row"></div>
+                    <div id="our-red3s" class="red3s-display"></div>
+                </div>
+                <div class="team-melds">
+                    <h3>Opponents <span id="opp-canastas"></span></h3>
+                    <div id="opp-melds" class="meld-row"></div>
+                    <div id="opp-red3s" class="red3s-display"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="player-hand"></div>
+    </div>
+    
+    <div id="action-buttons">
+        <button class="action-btn primary" id="draw-btn" onclick="drawCards()">Draw 2</button>
+        <button class="action-btn secondary" id="pickup-btn" onclick="pickupDiscard()">Pick Up</button>
+        <button class="action-btn secondary" id="meld-btn" onclick="createMeld()">New Meld</button>
+        <button class="action-btn secondary" id="add-btn" onclick="addToMeld()">Add to Meld</button>
+        <button class="action-btn warning" id="discard-btn" onclick="discardCard()">Discard</button>
+        <button class="action-btn danger" id="clear-btn" onclick="clearSelection()">Clear</button>
+    </div>
+</div>
+
+<div id="message"></div>
+
+<script>
+// Constants
+const SUITS = ['♠', '♣', '♥', '♦'];
+const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const VALUES = {A:20, 2:20, 3:5, 4:5, 5:5, 6:5, 7:5, 8:10, 9:10, 10:10, J:10, Q:10, K:10};
+const PLAYERS = ['South', 'West', 'North', 'East'];
+const TEAMS = {South: 0, North: 0, West: 1, East: 1};
+const MIN_MELD = [50, 90, 120];
+
+// Game state
+let game = {
+    deck: [],
+    hands: {South: [], West: [], North: [], East: []},
+    melds: {South: [], West: [], North: [], East: []},
+    red3s: {South: [], West: [], North: [], East: []},
+    discardPile: [],
+    currentPlayerIndex: 0,
+    selectedCards: new Set(),
+    teamScores: [0, 0],
+    handNumber: 1,
+    hasDrawn: false,
+    frozen: false,
+    gameOver: false
+};
+
+// Build deck (3 decks + 6 jokers)
+function buildDeck() {
+    let deck = [];
+    let id = 0;
+    for (let d = 0; d < 3; d++) {
+        for (let suit of SUITS) {
+            for (let rank of RANKS) {
+                deck.push({
+                    id: id++,
+                    rank,
+                    suit,
+                    value: VALUES[rank],
+                    isWild: rank === '2',
+                    isRed3: rank === '3' && (suit === '♥' || suit === '♦')
+                });
+            }
+        }
+        deck.push({id: id++, rank: 'JKR', suit: '🃏', value: 50, isWild: true});
+        deck.push({id: id++, rank: 'JKR', suit: '🃏', value: 50, isWild: true});
+    }
+    return deck;
+}
+
+function shuffleDeck(deck) {
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+}
+
+function dealCards() {
+    for (let i = 0; i < 15; i++) {
+        for (let p of PLAYERS) {
+            game.hands[p].push(game.deck.pop());
+        }
+    }
+    game.discardPile.push(game.deck.pop());
+}
+
+function autoRevealRed3s() {
+    for (let p of PLAYERS) {
+        let i = 0;
+        while (i < game.hands[p].length) {
+            if (game.hands[p][i].isRed3) {
+                game.red3s[p].push(game.hands[p][i]);
+                game.hands[p].splice(i, 1);
+                if (game.deck.length > 0) {
+                    game.hands[p].push(game.deck.pop());
+                }
+            } else {
+                i++;
+            }
+        }
+    }
+}
+
+function drawCards() {
+    if (game.hasDrawn || game.gameOver) return;
+    
+    const player = PLAYERS[game.currentPlayerIndex];
+    if (game.deck.length < 2) {
+        showMessage("Not enough cards in deck!");
+        return;
+    }
+    
+    game.hands[player].push(game.deck.pop());
+    game.hands[player].push(game.deck.pop());
+    game.hasDrawn = true;
+    
+    autoRevealRed3s();
+    updateUI();
+    showMessage("Drew 2 cards");
+}
+
+function pickupDiscard() {
+    if (!game.hasDrawn || game.gameOver || game.discardPile.length === 0) return;
+    
+    const player = PLAYERS[game.currentPlayerIndex];
+    const topCard = game.discardPile[game.discardPile.length - 1];
+    
+    if (topCard.rank === '3' && (topCard.suit === '♥' || topCard.suit === '♦')) {
+        showMessage("Cannot pick up red 3!");
+        return;
+    }
+    
+    if (topCard.isWild) {
+        showMessage("Cannot pick up wild card!");
+        return;
+    }
+    
+    if (game.frozen) {
+        const selected = Array.from(game.selectedCards).map(id => 
+            game.hands[player].find(c => c.id === id)
+        );
+        
+        const naturalPair = selected.filter(c => c && c.rank === topCard.rank && !c.isWild);
+        if (naturalPair.length < 2) {
+            showMessage("Need 2 natural cards to pick up frozen pile!");
+            return;
+        }
+    }
+    
+    // Pick up entire discard pile
+    while (game.discardPile.length > 0) {
+        game.hands[player].push(game.discardPile.pop());
+    }
+    
+    showMessage("Picked up discard pile!");
+    updateUI();
+}
+
+function createMeld() {
+    const player = PLAYERS[game.currentPlayerIndex];
+    const selected = Array.from(game.selectedCards).map(id => 
+        game.hands[player].find(c => c.id === id)
+    ).filter(c => c);
+    
+    if (selected.length < 3) {
+        showMessage("Need at least 3 cards for a meld!");
+        return;
+    }
+    
+    // Check all same rank or valid wild combination
+    const ranks = new Set(selected.map(c => c.rank));
+    const wilds = selected.filter(c => c.isWild).length;
+    const naturals = selected.filter(c => !c.isWild);
+    
+    if (ranks.size > 2 || (ranks.size === 2 && wilds === 0)) {
+        showMessage("Invalid meld - cards must be same rank!");
+        return;
+    }
+    
+    if (wilds > naturals.length) {
+        showMessage("Cannot have more wilds than natural cards!");
+        return;
+    }
+    
+    // Check minimum meld value
+    const teamIdx = TEAMS[player];
+    const teamScore = game.teamScores[teamIdx];
+    let minRequired = MIN_MELD[0];
+    if (teamScore >= 1500) minRequired = MIN_MELD[1];
+    if (teamScore >= 3000) minRequired = MIN_MELD[2];
+    
+    const hasExistingMelds = game.melds[player].length > 0 || 
+                             game.melds[getPartner(player)].length > 0;
+    
+    if (!hasExistingMelds) {
+        const meldValue = selected.reduce((sum, c) => sum + c.value, 0);
+        if (meldValue < minRequired) {
+            showMessage(`Need ${minRequired} points for first meld!`);
+            return;
+        }
+    }
+    
+    // Create meld
+    game.melds[player].push([...selected]);
+    
+    // Remove from hand
+    for (let card of selected) {
+        const idx = game.hands[player].findIndex(c => c.id === card.id);
+        if (idx !== -1) game.hands[player].splice(idx, 1);
+    }
+    
+    game.selectedCards.clear();
+    showMessage("Meld created!");
+    updateUI();
+}
+
+function addToMeld() {
+    const player = PLAYERS[game.currentPlayerIndex];
+    const selected = Array.from(game.selectedCards).map(id => 
+        game.hands[player].find(c => c.id === id)
+    ).filter(c => c);
+    
+    if (selected.length === 0) {
+        showMessage("Select cards to add!");
+        return;
+    }
+    
+    // Find matching meld
+    const allTeamMelds = [...game.melds[player], ...game.melds[getPartner(player)]];
+    
+    for (let card of selected) {
+        let added = false;
+        for (let meld of allTeamMelds) {
+            const meldRank = meld.find(c => !c.isWild)?.rank;
+            if (meldRank === card.rank || card.isWild) {
+                // Check wild limit
+                const meldWilds = meld.filter(c => c.isWild).length;
+                const meldNaturals = meld.filter(c => !c.isWild).length;
+                if (card.isWild && meldWilds >= meldNaturals) {
+                    continue;
+                }
+                meld.push(card);
+                added = true;
+                break;
+            }
+        }
+        
+        if (!added) {
+            showMessage("No matching meld found for " + card.rank);
+            return;
+        }
+    }
+    
+    // Remove from hand
+    for (let card of selected) {
+        const idx = game.hands[player].findIndex(c => c.id === card.id);
+        if (idx !== -1) game.hands[player].splice(idx, 1);
+    }
+    
+    game.selectedCards.clear();
+    showMessage("Added to meld!");
+    updateUI();
+}
+
+function discardCard() {
+    if (!game.hasDrawn || game.gameOver) return;
+    
+    const player = PLAYERS[game.currentPlayerIndex];
+    const selected = Array.from(game.selectedCards);
+    
+    if (selected.length !== 1) {
+        showMessage("Select exactly 1 card to discard!");
+        return;
+    }
+    
+    const cardId = selected[0];
+    const cardIdx = game.hands[player].findIndex(c => c.id === cardId);
+    if (cardIdx === -1) return;
+    
+    const card = game.hands[player][cardIdx];
+    
+    // Check if can go out
+    if (game.hands[player].length === 1) {
+        const teamMelds = [...game.melds[player], ...game.melds[getPartner(player)]];
+        const canastas = teamMelds.filter(m => m.length >= 7).length;
+        
+        if (canastas < 1) {
+            showMessage("Need at least 1 canasta to go out!");
+            return;
+        }
+    }
+    
+    game.discardPile.push(card);
+    game.hands[player].splice(cardIdx, 1);
+    game.selectedCards.clear();
+    
+    // Check if freezes pile
+    if (card.isWild || card.rank === '3') {
+        game.frozen = true;
+    }
+    
+    // Check if hand ended
+    if (game.hands[player].length === 0) {
+        endHand();
+        return;
+    }
+    
+    nextPlayer();
+}
+
+function nextPlayer() {
+    game.currentPlayerIndex = (game.currentPlayerIndex + 1) % 4;
+    game.hasDrawn = false;
+    game.selectedCards.clear();
+    updateUI();
+    
+    // AI turn
+    if (game.currentPlayerIndex !== 0) {
+        setTimeout(aiTurn, 1000);
+    }
+}
+
+function aiTurn() {
+    const player = PLAYERS[game.currentPlayerIndex];
+    
+    // Simple AI: draw, try to meld, discard random
+    if (!game.hasDrawn) {
+        drawCards();
+        setTimeout(() => {
+            // Try to create melds
+            const hand = game.hands[player];
+            const rankCounts = {};
+            for (let card of hand) {
+                if (!card.isWild) {
+                    rankCounts[card.rank] = (rankCounts[card.rank] || 0) + 1;
+                }
+            }
+            
+            // Look for 3+ of a kind
+            for (let rank in rankCounts) {
+                if (rankCounts[rank] >= 3) {
+                    const cards = hand.filter(c => c.rank === rank).slice(0, 3);
+                    game.melds[player].push(cards);
+                    for (let card of cards) {
+                        const idx = hand.findIndex(c => c.id === card.id);
+                        if (idx !== -1) hand.splice(idx, 1);
+                    }
+                    break;
+                }
+            }
+            
+            // Discard random non-wild
+            const nonWilds = hand.filter(c => !c.isWild);
+            const toDiscard = nonWilds.length > 0 ? nonWilds[0] : hand[0];
+            if (toDiscard) {
+                const idx = hand.findIndex(c => c.id === toDiscard.id);
+                if (idx !== -1) {
+                    game.discardPile.push(hand[idx]);
+                    hand.splice(idx, 1);
+                    
+                    if (hand.length === 0) {
+                        endHand();
+                        return;
+                    }
+                }
+            }
+            
+            nextPlayer();
+        }, 1000);
+    }
+}
+
+function endHand() {
+    // Calculate scores
+    for (let team = 0; team < 2; team++) {
+        let score = 0;
+        const players = PLAYERS.filter(p => TEAMS[p] === team);
+        
+        for (let p of players) {
+            // Melds
+            for (let meld of game.melds[p]) {
+                for (let card of meld) {
+                    score += card.value;
+                }
+                // Canasta bonuses
+                if (meld.length >= 7) {
+                    const hasWild = meld.some(c => c.isWild);
+                    score += hasWild ? 300 : 500;
+                }
+            }
+            
+            // Red 3s
+            score += game.red3s[p].length * 100;
+            
+            // Penalty for cards in hand
+            for (let card of game.hands[p]) {
+                score -= card.value;
+            }
+        }
+        
+        game.teamScores[team] += score;
+    }
+    
+    // Check for winner
+    if (game.teamScores[0] >= 5000 || game.teamScores[1] >= 5000) {
+        const winner = game.teamScores[0] > game.teamScores[1] ? "Team 1" : "Team 2";
+        showMessage(`${winner} wins! Final: ${game.teamScores[0]} - ${game.teamScores[1]}`);
+        game.gameOver = true;
+        updateUI();
+        return;
+    }
+    
+    // Next hand
+    game.handNumber++;
+    game.deck = buildDeck();
+    shuffleDeck(game.deck);
+    game.discardPile = [];
+    game.frozen = false;
+    game.hasDrawn = false;
+    
+    for (let p of PLAYERS) {
+        game.hands[p] = [];
+        game.melds[p] = [];
+        game.red3s[p] = [];
+    }
+    
+    dealCards();
+    autoRevealRed3s();
+    game.currentPlayerIndex = game.handNumber % 4;
+    
+    updateUI();
+    showMessage("New hand started!");
+    
+    if (game.currentPlayerIndex !== 0) {
+        setTimeout(aiTurn, 1500);
+    }
+}
+
+function getPartner(player) {
+    const idx = PLAYERS.indexOf(player);
+    return PLAYERS[(idx + 2) % 4];
+}
+
+function toggleCard(cardId) {
+    if (game.selectedCards.has(cardId)) {
+        game.selectedCards.delete(cardId);
+    } else {
+        game.selectedCards.add(cardId);
+    }
+    updateUI();
+}
+
+function clearSelection() {
+    game.selectedCards.clear();
+    updateUI();
+}
+
+function showMessage(text) {
+    const msg = document.getElementById('message');
+    msg.textContent = text;
+    msg.className = 'show';
+    setTimeout(() => msg.className = '', 2000);
+}
+
+function renderCard(card, isOpponent = false) {
+    const div = document.createElement('div');
+    div.className = `card ${card.suit === '♥' || card.suit === '♦' ? 'red' : 'black'}`;
+    if (card.isWild) div.classList.add('wild');
+    if (isOpponent) div.classList.add('opponent');
+    if (!isOpponent && game.selectedCards.has(card.id)) div.classList.add('selected');
+    
+    if (!isOpponent) {
+        div.onclick = () => toggleCard(card.id);
+    }
+    
+    if (isOpponent) {
+        div.innerHTML = '<div class="card-rank">?</div>';
+    } else {
+        div.innerHTML = `
+            <div class="card-rank">${card.rank}</div>
+            <div class="card-suit">${card.suit}</div>
+            <div class="card-value">${card.value}</div>
+        `;
+    }
+    
+    return div;
+}
+
+function updateUI() {
+    // Score
+    document.getElementById('team1-score').textContent = game.teamScores[0];
+    document.getElementById('team2-score').textContent = game.teamScores[1];
+    document.getElementById('hand-num').textContent = game.handNumber;
+    
+    // Turn indicator
+    const turnElem = document.getElementById('turn-indicator');
+    const currentPlayer = PLAYERS[game.currentPlayerIndex];
+    turnElem.textContent = `${currentPlayer}'s Turn - Hand ${game.handNumber}`;
+    turnElem.style.background = game.currentPlayerIndex === 0 ? 'rgba(76,175,80,0.5)' : 'rgba(255,255,255,0.2)';
+    
+    // Deck
+    document.getElementById('deck-count').textContent = game.deck.length;
+    
+    // Discard pile
+    const discardElem = document.getElementById('discard-top');
+    if (game.discardPile.length > 0) {
+        const top = game.discardPile[game.discardPile.length - 1];
+        discardElem.innerHTML = `${top.rank}${top.suit}<br><small>${game.discardPile.length}</small>`;
+    } else {
+        discardElem.textContent = 'Empty';
+    }
+    
+    const discardPile = document.getElementById('discard-pile');
+    discardPile.className = `pile ${game.frozen ? 'frozen' : ''}`;
+    
+    // Player hand
+    const handElem = document.getElementById('player-hand');
+    handElem.innerHTML = '';
+    game.hands.South.sort((a, b) => {
+        if (a.rank !== b.rank) return RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank);
+        return SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit);
+    });
+    for (let card of game.hands.South) {
+        handElem.appendChild(renderCard(card));
+    }
+    
+    // Opponent cards
+    const oppElem = document.getElementById('opponent-area');
+    oppElem.innerHTML = '';
+    const opp = PLAYERS[2]; // North
+    for (let i = 0; i < Math.min(game.hands[opp].length, 15); i++) {
+        oppElem.appendChild(renderCard({id: -1, rank: '?', suit: '', value: 0}, true));
+    }
+    
+    // Melds
+    renderTeamMelds(0, 'our');
+    renderTeamMelds(1, 'opp');
+    
+    // Buttons
+    const isMyTurn = game.currentPlayerIndex === 0;
+    document.getElementById('draw-btn').disabled = !isMyTurn || game.hasDrawn || game.gameOver;
+    document.getElementById('pickup-btn').disabled = !isMyTurn || !game.hasDrawn || game.gameOver || game.discardPile.length === 0;
+    document.getElementById('meld-btn').disabled = !isMyTurn || game.gameOver;
+    document.getElementById('add-btn').disabled = !isMyTurn || game.gameOver;
+    document.getElementById('discard-btn').disabled = !isMyTurn || !game.hasDrawn || game.gameOver;
+}
+
+function renderTeamMelds(teamIdx, prefix) {
+    const players = PLAYERS.filter(p => TEAMS[p] === teamIdx);
+    const meldsElem = document.getElementById(`${prefix}-melds`);
+    meldsElem.innerHTML = '';
+    
+    let canastas = 0;
+    
+    for (let p of players) {
+        for (let meld of game.melds[p]) {
+            const meldDiv = document.createElement('div');
+            meldDiv.className = 'meld';
+            
+            for (let card of meld) {
+                const cardDiv = renderCard(card);
+                cardDiv.style.width = '40px';
+                cardDiv.style.height = '56px';
+                cardDiv.style.fontSize = '9px';
+                cardDiv.onclick = null;
+                meldDiv.appendChild(cardDiv);
+            }
+            
+            if (meld.length >= 7) {
+                canastas++;
+                const badge = document.createElement('span');
+                const hasWild = meld.some(c => c.isWild);
+                badge.className = `canasta-badge ${hasWild ? 'mixed-canasta' : 'natural-canasta'}`;
+                badge.textContent = hasWild ? 'Mixed' : 'Natural';
+                meldDiv.appendChild(badge);
+            }
+            
+            meldsElem.appendChild(meldDiv);
+        }
+    }
+    
+    // Canasta count
+    document.getElementById(`${prefix}-canastas`).textContent = canastas > 0 ? `(${canastas} Canasta${canastas > 1 ? 's' : ''})` : '';
+    
+    // Red 3s
+    const red3sElem = document.getElementById(`${prefix}-red3s`);
+    let red3Count = 0;
+    for (let p of players) {
+        red3Count += game.red3s[p].length;
+    }
+    red3sElem.textContent = red3Count > 0 ? `Red 3s: ${red3Count} (+${red3Count * 100} pts)` : '';
+}
+
+// Initialize game
+game.deck = buildDeck();
+shuffleDeck(game.deck);
+dealCards();
+autoRevealRed3s();
+updateUI();
+
+// Prevent pull-to-refresh and double-tap zoom
+document.body.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 1) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
+let lastTouchEnd = 0;
+document.body.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+    }
+    lastTouchEnd = now;
+}, false);
+</script>
+</body>
+</html>
